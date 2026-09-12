@@ -1,0 +1,2664 @@
+<!DOCTYPE html>
+<html lang="az">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Günlük Gider Takibi</title>
+<!-- ==== PWA: manifest.json, sw.js, icon-192.png, icon-512.png ilə eyni qovluqda olmalıdır ====
+     Bunları http(s):// üzərindən açmaq lazımdır (file:// ilə Service Worker işləmir,
+     Google Drive girişi ilə eynən). Məs: GitHub Pages, Netlify və ya `python3 -m http.server`. -->
+<link rel="manifest" href="manifest.json">
+<link rel="icon" href="icon-192.png">
+<link rel="apple-touch-icon" href="icon-192.png">
+<meta name="theme-color" content="#1f2a44">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Xərclər">
+<!-- Chart.js: Aylıq xülasədəki pasta və trend qrafikləri üçün (internet lazımdır) -->
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
+<style>
+  :root{
+    --bg: #eef1f6;
+    --panel: #ffffff;
+    --panel-alt: #f7f8fb;
+    --ink: #1c2333;
+    --muted: #6b7688;
+    --line: #e3e7ee;
+    --navy: #1f2a44;
+    --navy-soft: #2c3a5c;
+    --gold: #c99a3a;
+    --gold-soft: #f4e6c6;
+    --gold-line: #e8d29c;
+    --gold-ink: #8a6a22;
+    --gold-ink-dark: #4a3a10;
+    --danger: #c0435a;
+    --danger-bg: #fceef0;
+    --danger-bg-soft: #fdf2f4;
+    --success-bg: #e3f3ec;
+    --success-ink: #2b7a56;
+    --input-border: #cdd3de;
+    --swatch-border: #ffffff;
+    --overlay: rgba(20,25,40,0.45);
+    --shadow: rgba(0,0,0,0.12);
+    --radius-lg: 18px;
+    --radius-md: 12px;
+    --radius-sm: 8px;
+    color-scheme: light;
+  }
+  [data-theme="dark"] {
+    --bg: #12151f;
+    --panel: #1b2030;
+    --panel-alt: #232a3d;
+    --ink: #e7eaf3;
+    --muted: #929cb5;
+    --line: #2c3448;
+    --navy: #2c3a5c;
+    --navy-soft: #3d4d76;
+    --gold: #d9ac4c;
+    --gold-soft: #3a3320;
+    --gold-line: #574a25;
+    --gold-ink: #e0b95e;
+    --gold-ink-dark: #f0d190;
+    --danger: #e2687e;
+    --danger-bg: #3a212a;
+    --danger-bg-soft: #2c1c22;
+    --success-bg: #1c332a;
+    --success-ink: #5cc99a;
+    --input-border: #3a4258;
+    --swatch-border: #1b2030;
+    --overlay: rgba(0,0,0,0.6);
+    --shadow: rgba(0,0,0,0.4);
+    color-scheme: dark;
+  }
+  * { box-sizing: border-box; }
+  body {
+    font-family: "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    background: var(--bg);
+    margin: 0;
+    padding: 20px 14px 60px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    min-height: 100vh;
+    color: var(--ink);
+    transition: background .2s, color .2s;
+  }
+  .container { width: 100%; max-width: 430px; }
+
+  .top {
+    display: flex; justify-content: space-between; align-items: baseline;
+    margin-bottom: 18px;
+  }
+  .top h1 {
+    font-size: 21px; font-weight: 700; letter-spacing: -0.01em; margin: 0;
+    font-family: Georgia, "Times New Roman", serif;
+  }
+  .gear-btn {
+    background: var(--panel); border: 1px solid var(--line); color: var(--navy-soft);
+    padding: 7px 12px; border-radius: 999px; font-size: 13px; font-weight: 600;
+    cursor: pointer; display: flex; align-items: center; gap: 5px;
+  }
+  .gear-btn:hover { border-color: var(--navy-soft); }
+
+  .hamburger-btn {
+    background: var(--panel); border: 1px solid var(--line); width: 38px; height: 38px;
+    border-radius: 10px; display: flex; align-items: center; justify-content: center;
+    cursor: pointer; font-size: 17px; color: var(--navy);
+  }
+  .hamburger-btn:hover { border-color: var(--navy-soft); }
+
+  .side-menu-overlay {
+    position: fixed; inset: 0; background: var(--overlay); display: none; z-index: 90;
+  }
+  .side-menu-overlay.active { display: block; }
+  .side-menu {
+    position: fixed; top: 0; left: 0; height: 100%; width: 250px; background: var(--panel);
+    box-shadow: 4px 0 20px var(--shadow); transform: translateX(-100%);
+    transition: transform .25s ease, background .2s; z-index: 95; padding: 22px 16px; display: flex;
+    flex-direction: column; gap: 4px; box-sizing: border-box;
+  }
+  .side-menu.active { transform: translateX(0); }
+  .side-menu .menu-title {
+    font-family: Georgia, "Times New Roman", serif; font-size: 18px; font-weight: 700;
+    color: var(--navy); margin: 4px 4px 14px;
+  }
+  .menu-balance-card {
+    background: var(--gold-soft); border: 1px solid var(--gold-line); border-radius: var(--radius-md);
+    padding: 12px 14px; margin: 0 2px 16px;
+  }
+  .menu-balance-card .k { font-size: 11px; color: var(--gold-ink); font-weight: 600; }
+  .menu-balance-card .v { font-size: 19px; font-weight: 700; color: var(--gold-ink-dark); margin-top: 2px; }
+  .menu-balance-card .v.low { color: var(--danger); }
+  .side-menu .menu-item {
+    display: flex; align-items: center; gap: 10px; padding: 11px 12px; border-radius: 10px;
+    border: none; background: transparent; font-size: 14px; font-weight: 600; color: var(--ink);
+    cursor: pointer; text-align: left; width: 100%;
+  }
+  .side-menu .menu-item:hover { background: var(--panel-alt); }
+  .side-menu .menu-item.active { background: var(--navy); color: #fff; }
+
+  .tabs {
+    display: flex; background: var(--panel); border: 1px solid var(--line);
+    border-radius: 999px; padding: 4px; margin-bottom: 16px;
+  }
+  .tab-btn {
+    flex: 1; padding: 8px 0; border-radius: 999px; border: none; background: transparent;
+    cursor: pointer; font-size: 13px; font-weight: 600; color: var(--muted);
+    transition: background .15s, color .15s;
+  }
+  .tab-btn.active { background: var(--navy); color: #fff; }
+
+  .summary-card {
+    background: var(--navy); color: #fff; border-radius: var(--radius-lg);
+    padding: 20px 20px 18px; margin-bottom: 14px; position: relative; overflow: hidden;
+  }
+  .summary-card::after {
+    content: ""; position: absolute; right: -40px; top: -40px; width: 140px; height: 140px;
+    border-radius: 50%; background: radial-gradient(circle, rgba(201,154,58,0.25), transparent 70%);
+  }
+  .summary-label { font-size: 12.5px; color: #c7cfe0; font-weight: 500; }
+  .summary-amount { font-size: 32px; font-weight: 700; margin-top: 2px; letter-spacing: -0.01em; }
+  .summary-sub { font-size: 12px; color: #9aa6c2; margin-top: 6px; }
+
+  .balance-card {
+    background: var(--gold-soft); border: 1px solid var(--gold-line); border-radius: var(--radius-lg);
+    padding: 16px 18px; margin-bottom: 12px; display: flex; justify-content: space-between; align-items: center;
+    gap: 10px;
+  }
+  .balance-card .info { min-width: 0; }
+  .balance-card .k { font-size: 12px; color: var(--gold-ink); font-weight: 600; }
+  .balance-card .v { font-size: 24px; font-weight: 700; color: var(--gold-ink-dark); margin-top: 2px; }
+  .balance-card .v.low { color: var(--danger); }
+  .balance-card .edit-btn {
+    background: var(--panel); border: 1px solid var(--gold-line); color: var(--gold-ink); font-weight: 600; font-size: 12px;
+    padding: 7px 12px; border-radius: 999px; cursor: pointer; white-space: nowrap;
+  }
+  .balance-card .edit-btn:hover { background: var(--gold-soft); }
+  .balance-bar-container {
+    width: 100%; height: 7px; background: rgba(138,106,34,0.18); border-radius: 999px; overflow: hidden; margin-top: 10px;
+  }
+  .balance-bar-fill { height: 100%; background: var(--gold-ink); }
+  .balance-card.stacked { flex-direction: column; align-items: stretch; }
+  .balance-card.stacked .top-row { display: flex; justify-content: space-between; align-items: center; }
+
+  .daily-limit-card {
+    background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius-lg);
+    padding: 14px 16px; margin-bottom: 14px; transition: background .2s, border-color .2s;
+  }
+  .daily-limit-card.over { border-color: var(--danger); background: var(--danger-bg-soft); }
+  .daily-limit-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
+  .daily-limit-head .lbl { font-size: 12.5px; font-weight: 600; color: var(--muted); }
+  .daily-limit-head .lbl.over { color: var(--danger); }
+  .daily-limit-head .pct { font-size: 13px; font-weight: 700; color: var(--navy); }
+  .daily-limit-head .pct.over { color: var(--danger); }
+  .daily-limit-bar-bg { width: 100%; height: 8px; background: var(--line); border-radius: 999px; overflow: hidden; margin-bottom: 8px; }
+  .daily-limit-bar-fill { height: 100%; background: var(--navy); border-radius: 999px; transition: width .2s, background .2s; }
+  .daily-limit-bar-fill.over { background: var(--danger); }
+  .daily-limit-foot { display: flex; justify-content: space-between; font-size: 12px; color: var(--muted); }
+  .daily-limit-foot .qalan { font-weight: 700; color: var(--navy); }
+  .daily-limit-foot .qalan.over { color: var(--danger); }
+
+  .progress-bar-container {
+    width: 100%; height: 10px; background: rgba(255,255,255,0.12); border-radius: 999px;
+    overflow: hidden; display: flex; margin: 16px 0 12px;
+  }
+  .breakdown { display: flex; flex-direction: column; gap: 6px; }
+  .breakdown-row {
+    display: flex; justify-content: space-between; align-items: center;
+    font-size: 12.5px; color: #dfe4f0;
+  }
+  .breakdown-row .dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; margin-right: 6px; }
+  .breakdown-empty { font-size: 12.5px; color: #9aa6c2; text-align: center; padding: 6px 0; }
+
+  .insight-strip {
+    display: flex; gap: 10px; margin-bottom: 18px;
+  }
+  .insight-box {
+    flex: 1; background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius-md);
+    padding: 10px 12px;
+  }
+  .insight-box .k { font-size: 11px; color: var(--muted); font-weight: 500; }
+  .insight-box .v { font-size: 15px; font-weight: 700; margin-top: 2px; color: var(--navy); }
+
+  .grid-buttons {
+    display: grid; grid-template-columns: repeat(2, minmax(0,1fr)); gap: 10px; margin-bottom: 14px;
+  }
+  .cat-btn {
+    color: #fff; font-weight: 600; padding: 14px 10px; border-radius: var(--radius-md); border: none;
+    cursor: pointer; display: flex; flex-direction: column; align-items: center; justify-content: center;
+    gap: 3px; min-height: 66px; transition: transform .08s;
+  }
+  .cat-btn:active { transform: scale(0.97); }
+  .cat-btn .name { font-size: 13.5px; text-align: center; }
+  .cat-btn .sub { font-size: 11px; opacity: 0.85; font-weight: 500; }
+
+  .dashed-btn {
+    width: 100%; margin-bottom: 22px; border: 1.5px dashed #b9c1d1; background: transparent;
+    color: var(--muted); font-weight: 600; padding: 11px; border-radius: var(--radius-md);
+    cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 7px; font-size: 13.5px;
+  }
+  .dashed-btn:hover { border-color: var(--navy-soft); color: var(--navy-soft); }
+
+  .history-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
+  .history-head span { font-weight: 700; font-size: 14.5px; color: var(--navy); }
+  .history-head button { font-size: 12px; color: var(--danger); background: none; border: none; cursor: pointer; font-weight: 600; }
+
+  .list-item {
+    display: flex; justify-content: space-between; align-items: center; background: var(--panel);
+    border: 1px solid var(--line); padding: 10px 12px; border-radius: var(--radius-sm); font-size: 13.5px; margin-bottom: 7px;
+  }
+  .list-item .cat { font-weight: 600; color: var(--ink); }
+  .list-item .time { display: block; font-size: 11px; color: var(--muted); margin-top: 1px; }
+  .list-item .right { display: flex; align-items: center; gap: 10px; }
+  .list-item .amt { font-weight: 700; color: var(--navy); }
+  .list-item button { color: #b7bfcf; background: none; border: none; cursor: pointer; font-size: 14px; }
+  .list-item button:hover { color: var(--danger); }
+  .empty-note { color: #9aa3b5; text-align: center; font-size: 13.5px; padding: 18px 0; margin: 0; }
+
+  .modal { position: fixed; inset: 0; background: var(--overlay); display: none; align-items: center; justify-content: center; padding: 16px; z-index: 50; }
+  .modal.active { display: flex; }
+  #confirmModal { z-index: 70; }
+  #newCatModal { z-index: 70; }
+  #transferModal { z-index: 70; }
+  #hesabDuzeltModal { z-index: 70; }
+  #krediBorcuDuzeltModal { z-index: 70; }
+  .monthly-item { display: flex; justify-content: space-between; align-items: center; gap: 10px; }
+  .monthly-item .left { display: flex; align-items: center; gap: 10px; min-width: 0; }
+  .monthly-item .icon { font-size: 18px; }
+  .monthly-item .name { font-weight: 600; font-size: 13.5px; }
+  .monthly-item .amt { font-size: 12px; color: var(--muted); }
+  .monthly-item .badge {
+    font-size: 11px; font-weight: 600; padding: 4px 9px; border-radius: 999px; white-space: nowrap;
+  }
+  .monthly-item .badge.paid { background: var(--success-bg); color: var(--success-ink); }
+  .monthly-item .badge.unpaid { background: var(--danger-bg); color: var(--danger); cursor: pointer; }
+  .monthly-item .del-btn { background: none; border: none; cursor: pointer; font-size: 13px; color: #b7bfcf; }
+  .monthly-item .del-btn:hover { color: var(--danger); }
+
+  .ay-row {
+    display: flex; align-items: center; gap: 10px; background: var(--panel-alt); border: 1px solid var(--line);
+    border-radius: var(--radius-md); padding: 10px 12px;
+  }
+  .ay-row .icon-input {
+    flex: 0 0 34px; width: 34px; border: 1px solid var(--line); background: var(--panel); text-align: center;
+    font-size: 16px; padding: 5px 2px; border-radius: 6px; color: var(--ink);
+  }
+  .ay-row .icon-input:focus { outline: none; border-color: var(--navy-soft); }
+  .ay-row .ay-name-input {
+    flex: 1 1 auto; min-width: 0; border: 1px solid transparent; background: transparent;
+    font-weight: 600; font-size: 13.5px; padding: 6px 6px; border-radius: 6px; color: var(--ink);
+  }
+  .ay-row .ay-name-input:hover, .ay-row .ay-name-input:focus { border-color: var(--line); background: var(--panel); outline: none; }
+  .ay-row .ay-amt-input {
+    flex: 0 0 72px; width: 72px; border: 1px solid var(--line); background: var(--panel);
+    font-size: 13px; font-weight: 600; padding: 6px 7px; border-radius: 6px; color: var(--navy); text-align: right;
+  }
+  .ay-row .ay-amt-input:focus { outline: none; border-color: var(--navy-soft); }
+  .ay-row .ay-checkbox { flex: 0 0 auto; width: 19px; height: 19px; accent-color: var(--navy); cursor: pointer; margin: 0; }
+  .ay-row .del-btn { flex: 0 0 auto; background: none; border: none; cursor: pointer; font-size: 13px; color: #b7bfcf; padding: 4px; }
+  .ay-row .taksit-badge { flex: 0 0 auto; font-size: 10px; font-weight: 600; color: var(--muted); white-space: nowrap; }
+  .ay-row .del-btn:hover { color: var(--danger); }
+  .ay-total-row {
+    display: flex; justify-content: space-between; align-items: center; font-weight: 700; font-size: 14.5px;
+    color: var(--navy); background: var(--gold-soft); border: 1px solid var(--gold-line); border-radius: var(--radius-md);
+    padding: 10px 14px; margin-bottom: 14px;
+  }
+  .modal-content { background: var(--panel); width: 100%; max-width: 400px; border-radius: 16px; padding: 22px; box-sizing: border-box; max-height: 88vh; display: flex; flex-direction: column; color: var(--ink); }
+  .modal-content h2, .page-inner h2 { font-size: 17px; margin: 0 0 4px; }
+  .modal-content p.hint, .page-inner p.hint { font-size: 12.5px; color: var(--muted); margin: 0 0 16px; }
+  .modal-list { overflow-y: auto; flex: 1; margin-bottom: 14px; display: flex; flex-direction: column; gap: 10px; padding-right: 2px; }
+  .modal-item { background: var(--panel-alt); border: 1px solid var(--line); border-radius: var(--radius-md); padding: 12px; display: flex; flex-direction: column; gap: 8px; }
+  .field-row { display: flex; align-items: center; gap: 8px; }
+  .field-row.between { justify-content: space-between; }
+  input[type="text"], input[type="number"] {
+    padding: 8px 10px; border: 1px solid var(--input-border); border-radius: 8px; font-size: 14px; outline: none; width: 100%;
+    font-family: inherit; background: var(--panel); color: var(--ink);
+  }
+  input:focus { border-color: var(--navy-soft); }
+  .swatch { width: 20px; height: 20px; border-radius: 50%; cursor: pointer; border: 2px solid var(--swatch-border); box-shadow: 0 0 0 1px var(--line); }
+  .swatch.selected { box-shadow: 0 0 0 2px var(--navy); }
+  .btn { border: none; border-radius: 10px; padding: 9px 16px; font-size: 13.5px; font-weight: 600; cursor: pointer; }
+  .btn-primary { background: var(--navy); color: #fff; }
+  .btn-primary:hover { background: var(--navy-soft); }
+  .btn-ghost { background: transparent; color: var(--muted); }
+  .btn-danger { background: var(--danger-bg); color: var(--danger); }
+  .modal-footer { display: flex; justify-content: flex-end; gap: 8px; border-top: 1px solid var(--line); padding-top: 14px; }
+  .error-text { font-size: 12px; color: var(--danger); min-height: 15px; margin-top: -4px; }
+
+  /* Full page sections (opened from the side menu) instead of centered popups */
+  .page-screen {
+    position: fixed; inset: 0; background: var(--bg); display: none;
+    flex-direction: column; z-index: 60; overflow-y: auto;
+  }
+  .page-screen.active { display: flex; animation: pageSlideIn .22s ease; }
+  @keyframes pageSlideIn { from { opacity: 0; transform: translateX(16px); } to { opacity: 1; transform: translateX(0); } }
+  .page-inner {
+    width: 100%; max-width: 430px; margin: 0 auto; box-sizing: border-box;
+    padding: 20px 14px 40px; flex: 1; display: flex; flex-direction: column; min-height: 100%;
+  }
+  .page-inner .modal-list { max-height: none; }
+  /* Long pages (like Hesablar və Borclar) have more content than fits one screen.
+     Without this, flexbox silently shrinks — and for elements with overflow:hidden/auto,
+     crops — children like .debt-summary-card or .modal-list instead of just letting the
+     page scroll. Forcing every direct child to keep its natural size fixes that. */
+  .page-inner > * { flex-shrink: 0; }
+
+  .loading-screen { display: flex; align-items: center; justify-content: center; min-height: 60vh; color: var(--muted); font-size: 14px; }
+
+  /* Güncel Borclar: combined debt summary chart */
+  .debt-summary-card {
+    background: var(--navy); color: #fff; border-radius: var(--radius-lg);
+    padding: 18px 18px 16px; margin-bottom: 14px; position: relative; overflow: hidden;
+  }
+  .debt-summary-label { font-size: 12.5px; color: #c7cfe0; font-weight: 500; }
+  .debt-summary-amount { font-size: 28px; font-weight: 700; margin-top: 2px; letter-spacing: -0.01em; }
+  .debt-chart-container {
+    width: 100%; height: 12px; background: rgba(255,255,255,0.12); border-radius: 999px;
+    overflow: hidden; display: flex; margin: 14px 0 10px;
+  }
+  .debt-breakdown { display: flex; flex-direction: column; gap: 6px; }
+  .debt-breakdown-row {
+    display: flex; justify-content: space-between; align-items: center;
+    font-size: 12.5px; color: #dfe4f0;
+  }
+  .debt-breakdown-row .dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; margin-right: 6px; }
+
+  /* Monthly installment column chart */
+  .taksit-chart { display: flex; align-items: flex-end; gap: 6px; margin-bottom: 16px; overflow-x: auto; padding-bottom: 2px; }
+  .taksit-bar-col { flex: 1 1 0; min-width: 28px; display: flex; flex-direction: column; align-items: center; }
+  .taksit-bar-amt { font-size: 9.5px; color: var(--muted); margin-bottom: 4px; font-weight: 600; white-space: nowrap; }
+  .taksit-bar-amt.paid { color: #2b7a56; }
+  .taksit-bar { width: 100%; max-width: 26px; height: 46px; border-radius: 6px 6px 3px 3px; background: var(--line); transition: background .2s; }
+  .taksit-bar.filled { background: var(--navy); }
+  .taksit-bar-month { font-size: 9.5px; color: var(--muted); margin-top: 5px; white-space: nowrap; }
+
+  .drive-box { background: var(--panel-alt); border: 1px solid var(--line); border-radius: var(--radius-md); padding: 10px 12px; margin: 0 2px 8px; }
+  .drive-box .drive-status { font-size: 12px; color: var(--muted); font-weight: 600; display: flex; align-items: center; gap: 6px; }
+  .drive-box .drive-status.ok { color: var(--success-ink); }
+  .drive-box .drive-status.err { color: var(--danger); }
+  .drive-box .drive-sub { font-size: 11px; color: var(--muted); margin-top: 3px; }
+  .drive-box .drive-btns { display: flex; gap: 6px; margin-top: 8px; }
+  .drive-box .drive-btns button { flex: 1; font-size: 11.5px; padding: 7px 6px; border-radius: 8px; border: 1px solid var(--line); background: var(--panel); cursor: pointer; font-weight: 600; color: var(--navy-soft); }
+  .drive-box .drive-btns button:hover { border-color: var(--navy-soft); }
+
+  .theme-toggle-row {
+    display: flex; align-items: center; justify-content: space-between; padding: 11px 12px; border-radius: 10px;
+    font-size: 14px; font-weight: 600; color: var(--ink);
+  }
+  .theme-switch {
+    position: relative; width: 42px; height: 24px; border-radius: 999px; background: var(--line);
+    border: none; cursor: pointer; flex: 0 0 auto; transition: background .2s;
+  }
+  .theme-switch::after {
+    content: ""; position: absolute; top: 2px; left: 2px; width: 20px; height: 20px; border-radius: 50%;
+    background: var(--panel); box-shadow: 0 1px 3px rgba(0,0,0,0.3); transition: transform .2s;
+  }
+  [data-theme="dark"] .theme-switch { background: var(--navy); }
+  [data-theme="dark"] .theme-switch::after { transform: translateX(18px); }
+
+  .hesabat-cemi-card {
+    background: var(--gold-soft); border: 1px solid var(--gold-line); border-radius: var(--radius-lg);
+    padding: 14px 16px; margin-bottom: 16px;
+  }
+  .hesabat-cemi-card .k { font-size: 12.5px; color: var(--gold-ink); font-weight: 600; }
+  .hesabat-cemi-card .v { font-size: 22px; font-weight: 700; color: var(--gold-ink-dark); margin-top: 2px; }
+  .hesabat-row { margin-bottom: 12px; }
+  .hesabat-row-top { display: flex; justify-content: space-between; font-size: 13.5px; font-weight: 600; color: var(--ink); margin-bottom: 5px; }
+  .hesabat-bar-bg { width: 100%; height: 10px; background: var(--panel-alt); border-radius: 999px; overflow: hidden; }
+  .hesabat-bar-fill { height: 100%; border-radius: 999px; transition: width .3s; }
+  .trend-row {
+    display: flex; justify-content: space-between; align-items: center; padding: 9px 12px; font-size: 13px;
+    font-weight: 600; background: var(--panel-alt); border: 1px solid var(--line); border-radius: var(--radius-sm); margin-bottom: 6px;
+  }
+  .trend-up { color: var(--danger); }
+  .trend-down { color: var(--success-ink); }
+  .trend-new { color: var(--gold-ink); }
+
+  .date-nav { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin: 2px 0 14px; }
+  .date-nav-arrow {
+    background: var(--panel); border: 1px solid var(--line); color: var(--navy-soft); width: 34px; height: 34px;
+    border-radius: 50%; font-size: 17px; line-height: 1; cursor: pointer; flex: 0 0 auto;
+    display: flex; align-items: center; justify-content: center;
+  }
+  .date-nav-arrow:disabled { opacity: 0.3; cursor: default; }
+  .date-nav-label { flex: 1; text-align: center; font-weight: 700; font-size: 14px; color: var(--ink); }
+
+  /* ==== Tətbiq kilidi (Face ID / Touch ID / PIN) ==== */
+  .lock-screen {
+    position: fixed; inset: 0; background: var(--bg); z-index: 200;
+    display: none; align-items: center; justify-content: center; padding: 20px;
+  }
+  .lock-screen.active { display: flex; }
+  .lock-box { width: 100%; max-width: 320px; text-align: center; }
+  .lock-icon { font-size: 42px; margin-bottom: 10px; }
+  .lock-box h2 { margin: 0 0 6px; font-size: 18px; color: var(--ink); }
+  #kilidPinInput { text-align: center; letter-spacing: 10px; font-size: 20px; margin-bottom: 8px; }
+  .toggle-switch {
+    position: relative; width: 42px; height: 24px; border-radius: 999px; background: var(--line);
+    border: none; cursor: pointer; flex: 0 0 auto; transition: background .2s;
+  }
+  .toggle-switch::after {
+    content: ""; position: absolute; top: 2px; left: 2px; width: 20px; height: 20px; border-radius: 50%;
+    background: var(--panel); box-shadow: 0 1px 3px rgba(0,0,0,0.3); transition: transform .2s;
+  }
+  .toggle-switch.on { background: var(--navy); }
+  .toggle-switch.on::after { transform: translateX(18px); }
+</style>
+<script src="https://accounts.google.com/gsi/client" async defer></script>
+</head>
+<body>
+
+<!-- Tətbiq kilidi: Face ID / Touch ID (WebAuthn) və ya ehtiyat PIN -->
+<div class="lock-screen" id="kilidEkrani">
+  <div class="lock-box">
+    <div class="lock-icon">🔒</div>
+    <h2>Tətbiq kilidlidir</h2>
+    <p class="hint" id="kilidHint">Davam etmək üçün təsdiqlə.</p>
+    <button class="btn btn-primary" id="kilidFaceBtn" onclick="kilidWebAuthnDogrula()" style="width:100%; margin-bottom:10px; display:none;">🔓 Face ID / Touch ID ilə aç</button>
+    <div id="kilidPinWrap" style="display:none;">
+      <input type="password" inputmode="numeric" maxlength="4" id="kilidPinInput" placeholder="PIN kodu">
+      <button class="btn btn-primary" onclick="kilidPinIleAc()" style="width:100%;">Aç</button>
+    </div>
+    <div class="error-text" id="kilidError"></div>
+  </div>
+</div>
+
+<!-- PIN təyin etmə (Face ID mövcud olmayanda ehtiyat) -->
+<div id="pinAyarlaModal" class="modal">
+  <div class="modal-content">
+    <h2>Ehtiyat PIN təyin et</h2>
+    <p class="hint">Bu cihaz Face ID/Touch ID dəstəkləmir (və ya rədd edildi). 4 rəqəmli bir PIN qoy.</p>
+    <input type="password" inputmode="numeric" maxlength="4" id="pinAyarlaInput" placeholder="Məs: 1234" style="text-align:center; letter-spacing:8px; font-size:18px;">
+    <div class="error-text" id="pinAyarlaError"></div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="modalKapat('pinAyarlaModal')">Ləğv et</button>
+      <button class="btn btn-primary" onclick="pinAyarlaOnayla()">Təyin et</button>
+    </div>
+  </div>
+</div>
+
+<div class="container" id="app">
+  <div class="loading-screen" id="loadingScreen">Yüklənir...</div>
+</div>
+
+<div class="side-menu-overlay" id="sideMenuOverlay" onclick="menuKapat()"></div>
+<div class="side-menu" id="sideMenu">
+  <div class="menu-title">Günlük Xərclər</div>
+  <div class="menu-balance-card" onclick="menuKapat(); hesablarPaneliniAc();" style="cursor:pointer;">
+    <div class="k">Kredit kartımın güncel borcu</div>
+    <div class="v" id="menuAnaHesapDeger">0.00 AZN</div>
+  </div>
+  <button class="menu-item active" id="menuAnaSehife" onclick="menuAnaSehifeSec()">🏠 Ana səhifə</button>
+  <button class="menu-item" id="menuAylikHesabat" onclick="menuAylikHesabatSec()">📈 Aylıq xülasə</button>
+  <button class="menu-item" id="menuHesablar" onclick="menuHesablarSec()">💰 Hesablar və Borclar</button>
+  <button class="menu-item" id="menuAyarlar" onclick="menuAyarlarSec()">⚙️ Ayarlar</button>
+  <div style="flex:1;"></div>
+  <div style="border-top:1px solid var(--line); padding-top:10px; margin-top:10px;">
+    <div class="drive-box" id="driveBox">
+      <div class="drive-status" id="driveStatus">☁️ Google Drive-a bağlı deyil</div>
+      <div class="drive-sub" id="driveSub">Bağlansan, "Göndər" və "Çək" düymələri ilə özün idarə edəcəksən.</div>
+      <div class="drive-sub" id="driveDebug" style="opacity:0.65;"></div>
+      <div class="drive-btns" id="driveBtns">
+        <button onclick="driveBaglan()">Bağlan</button>
+      </div>
+      <label id="driveAutoRow" style="display:none; align-items:center; justify-content:space-between; gap:8px; margin-top:9px; font-size:11.5px; color:var(--muted); cursor:pointer;">
+        <span>Hər dəyişiklikdə avtomatik göndər</span>
+        <input type="checkbox" id="driveAutoSyncCheckbox" onchange="driveOtomatikSyncToggle(this.checked)" style="width:auto; accent-color:var(--navy);">
+      </label>
+    </div>
+    <button class="menu-item" id="menuBackupIndir" onclick="backupIndir()">📥 Backup yüklə (JSON)</button>
+    <button class="menu-item" id="menuBackupBerpa" onclick="document.getElementById('backupFileInput').click()">📤 Backup bərpa et</button>
+    <input type="file" id="backupFileInput" accept="application/json" style="display:none;" onchange="backupBerpaEt(event)">
+  </div>
+</div>
+
+<!-- Amount entry modal -->
+<div id="amountModal" class="modal">
+  <div class="modal-content">
+    <h2 id="amountModalTitle">Tutarı daxil et</h2>
+    <p class="hint">Bu xərc üçün məbləği AZN olaraq yaz.</p>
+    <input type="number" step="0.01" min="0" id="amountInput" placeholder="0.00" style="margin-bottom:10px;">
+    <div id="amountReasonWrap" style="display:none;">
+      <label style="font-size:12px; color:var(--muted); font-weight:600; display:block; margin-bottom:4px;">Səbəb</label>
+      <input type="text" id="amountReasonInput" placeholder="Məs: Taksi, hədiyyə, təmir...">
+    </div>
+    <div class="error-text" id="amountError"></div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="modalKapat('amountModal')">Ləğv et</button>
+      <button class="btn btn-primary" onclick="amountModalOnayla()">Əlavə et</button>
+    </div>
+  </div>
+</div>
+
+<!-- Credit card modal: limit + actual balance -->
+<div id="balanceModal" class="modal">
+  <div class="modal-content">
+    <h2>Kredit kartı</h2>
+    <p class="hint">Kartının limitini və hazırkı borcunu yaz. Hər xərc avtomatik olaraq borcu artıracaq (mənfi tərəfə).</p>
+    <div style="margin-bottom:12px;">
+      <label style="font-size:12px; color:var(--muted); font-weight:600; display:block; margin-bottom:4px;">Kredit limiti (AZN)</label>
+      <input type="number" step="0.01" min="0" id="cardLimitInput" placeholder="Məs: 2000">
+    </div>
+    <div style="margin-bottom:6px;">
+      <label style="font-size:12px; color:var(--muted); font-weight:600; display:block; margin-bottom:4px;">Borc (AZN)</label>
+      <input type="number" step="0.01" max="0" id="cardBalanceInput" placeholder="Məs: -800">
+    </div>
+    <div class="error-text" id="balanceError"></div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="modalKapat('balanceModal')">Ləğv et</button>
+      <button class="btn btn-primary" onclick="balanceModalOnayla()">Yadda saxla</button>
+    </div>
+  </div>
+</div>
+
+<!-- New category modal -->
+<div id="newCatModal" class="modal">
+  <div class="modal-content">
+    <h2>Yeni kateqoriya</h2>
+    <p class="hint">Ad ver və istəsən sabit bir məbləğ təyin et.</p>
+    <div class="field-row" style="margin-bottom:10px;">
+      <input type="text" id="newCatName" placeholder="Məs: Metro, Kofe, Fatura">
+    </div>
+    <div class="field-row" style="margin-bottom:6px;">
+      <input type="number" step="0.01" min="0" id="newCatFixed" placeholder="Sabit tutar (boş = hər dəfə soruş)">
+    </div>
+    <div class="error-text" id="newCatError"></div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="modalKapat('newCatModal')">Ləğv et</button>
+      <button class="btn btn-primary" onclick="yeniKategoriOnayla()">Əlavə et</button>
+    </div>
+  </div>
+</div>
+
+<!-- Xərci düzəlt / köhnə tarixli xərc əlavə et -->
+<div id="islemFormModal" class="modal">
+  <div class="modal-content">
+    <h2 id="islemFormBaslik">Xərci düzəlt</h2>
+    <p class="hint">Kateqoriya, məbləğ, səbəb və tarixi dəyiş.</p>
+    <div style="margin-bottom:10px;">
+      <label style="font-size:12px; color:var(--muted); font-weight:600; display:block; margin-bottom:4px;">Kateqoriya</label>
+      <select id="islemFormKategori" style="width:100%; padding:9px 10px; border:1px solid var(--input-border); border-radius:8px; font-size:14px; background:var(--panel); color:var(--ink);"></select>
+    </div>
+    <div style="margin-bottom:10px;">
+      <label style="font-size:12px; color:var(--muted); font-weight:600; display:block; margin-bottom:4px;">Məbləğ (AZN)</label>
+      <input type="number" step="0.01" min="0" id="islemFormTutar" placeholder="0.00">
+    </div>
+    <div style="margin-bottom:10px;">
+      <label style="font-size:12px; color:var(--muted); font-weight:600; display:block; margin-bottom:4px;">Səbəb (istəyə bağlı)</label>
+      <input type="text" id="islemFormSebeb" placeholder="Məs: Taksi, hədiyyə...">
+    </div>
+    <div style="margin-bottom:6px;">
+      <label style="font-size:12px; color:var(--muted); font-weight:600; display:block; margin-bottom:4px;">Tarix</label>
+      <input type="date" id="islemFormTarix">
+    </div>
+    <div class="error-text" id="islemFormError"></div>
+    <div class="modal-footer" style="justify-content:space-between;">
+      <button class="btn btn-danger" id="islemFormSilBtn" onclick="islemFormSilOnayla()" style="display:none;">Sil</button>
+      <div style="display:flex; gap:8px;">
+        <button class="btn btn-ghost" onclick="modalKapat('islemFormModal')">Ləğv et</button>
+        <button class="btn btn-primary" onclick="islemFormOnayla()">Yadda saxla</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Generic confirm modal -->
+<div id="confirmModal" class="modal">
+  <div class="modal-content">
+    <h2 id="confirmTitle">Əminsən?</h2>
+    <p class="hint" id="confirmText"></p>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="modalKapat('confirmModal')">Ləğv et</button>
+      <button class="btn btn-danger" id="confirmActionBtn">Bəli, sil</button>
+    </div>
+  </div>
+</div>
+
+<!-- Drive: available backups list to pick from -->
+<div id="driveBackupSecModal" class="modal">
+  <div class="modal-content">
+    <h2>Hansı backup?</h2>
+    <p class="hint">Drive-a göndərilmiş backuplardan birini seç.</p>
+    <div id="driveBackupSecListesi" class="modal-list" style="max-height:320px;"></div>
+    <div class="modal-footer" style="justify-content:flex-end;">
+      <button class="btn btn-ghost" onclick="modalKapat('driveBackupSecModal')">Bağla</button>
+    </div>
+  </div>
+</div>
+
+<!-- Ayarlar (Settings) page: Günlük limit + Kateqoriyalar + Son əməliyyatlar + İşıq rejimi -->
+<div id="ayarlarModal" class="page-screen">
+  <div class="page-inner">
+    <div class="field-row between" style="border-bottom:1px solid var(--line); padding-bottom:12px; margin-bottom:4px;">
+      <button onclick="ayarlarPaneliniKapat()" style="background:none; border:none; font-size:18px; color:var(--navy-soft); cursor:pointer; padding:0 8px 0 0;">←</button>
+      <h2 style="margin:0; flex:1;">Ayarlar</h2>
+    </div>
+
+    <div class="modal-item" style="margin-bottom:14px;">
+      <b>Günlük xərc limiti</b>
+      <p class="hint" style="margin:0;">Gündəlik xərclər bu məbləği keçəndə xəbərdarlıq rəngi görünəcək.</p>
+      <div class="field-row" style="gap:8px;">
+        <input type="number" step="0.01" min="0" id="gunlukLimitInput" placeholder="Məs: 20" style="flex:1;">
+        <button class="btn btn-primary" onclick="gunlukLimitYadSaxla()" style="white-space:nowrap;">Yadda saxla</button>
+      </div>
+      <div class="error-text" id="gunlukLimitError"></div>
+    </div>
+
+    <button class="btn btn-ghost" style="width:100%; justify-content:flex-start; border:1px solid var(--line); margin-bottom:8px;" onclick="ayarlarKateqoriyalarAc()">⚙ Kateqoriyalar</button>
+    <button class="btn btn-ghost" style="width:100%; justify-content:flex-start; border:1px solid var(--line); margin-bottom:14px;" onclick="ayarlarSonEmeliyyatlarAc()">🧾 Son əməliyyatlar</button>
+
+    <div class="theme-toggle-row" style="border:1px solid var(--line); border-radius:var(--radius-md); padding:12px 14px; margin-bottom:8px;">
+      <span id="temaLabel">🌙 Qaranlıq rejim</span>
+      <button class="theme-switch" id="temaSwitch" onclick="temaDeyis()" aria-label="Tema dəyiş"></button>
+    </div>
+
+    <div class="modal-item" style="margin-bottom:14px;">
+      <div class="theme-toggle-row" style="padding:0;">
+        <span id="kilidAyarLabel">🔒 Tətbiq kilidi (Face ID / PIN)</span>
+        <button class="toggle-switch" id="kilidAyarSwitch" onclick="kilidToggle()" aria-label="Tətbiq kilidini aç/bağla"></button>
+      </div>
+      <p class="hint" style="margin:6px 0 0;">Açıq olanda tətbiqi hər açışda Face ID/Touch ID (dəstəklənmirsə PIN) ilə təsdiqləməli olursan.</p>
+      <div class="error-text" id="kilidAyarError"></div>
+    </div>
+
+    <div class="modal-footer" style="justify-content:flex-end; margin-top:16px;">
+      <button class="btn btn-ghost" onclick="ayarlarPaneliniKapat()">Bağla</button>
+    </div>
+  </div>
+</div>
+
+<!-- Category management page -->
+<div id="yonetimModal" class="page-screen">
+  <div class="page-inner">
+    <div class="field-row between" style="border-bottom:1px solid var(--line); padding-bottom:12px; margin-bottom:4px;">
+      <button onclick="yonetimPaneliniKapat()" style="background:none; border:none; font-size:18px; color:var(--navy-soft); cursor:pointer; padding:0 8px 0 0;">←</button>
+      <h2 style="margin:0; flex:1;">Kateqoriyalar</h2>
+    </div>
+    <p class="hint">Adını, ikonunu, rəngini və sabit qiymətini dəyiş.</p>
+    <div id="kategoriDuzenlemeListesi" class="modal-list"></div>
+    <div class="modal-footer" style="justify-content:space-between;">
+      <button class="btn btn-ghost" onclick="yeniKategoriModalAc()">➕ Yeni kateqoriya</button>
+      <button class="btn btn-primary" onclick="yonetimPaneliniKapat()">Bağla</button>
+    </div>
+  </div>
+</div>
+
+<!-- Monthly spending report page: "Bu ay hara pul gedir?" -->
+<div id="aylikHesabatModal" class="page-screen">
+  <div class="page-inner">
+    <div class="field-row between" style="border-bottom:1px solid var(--line); padding-bottom:12px; margin-bottom:4px;">
+      <button onclick="aylikHesabatPaneliniKapat()" style="background:none; border:none; font-size:18px; color:var(--navy-soft); cursor:pointer; padding:0 8px 0 0;">←</button>
+      <h2 style="margin:0; flex:1;">Bu ay hara pul gedir?</h2>
+    </div>
+    <div class="hesabat-cemi-card">
+      <div class="k">Bu ay xərclədiyin</div>
+      <div class="v" id="aylikHesabatCemi">0.00 AZN</div>
+    </div>
+    <div style="background:var(--panel); border:1px solid var(--line); border-radius:var(--radius-lg); padding:14px; margin-bottom:16px;">
+      <canvas id="aylikPastaCanvas" height="200"></canvas>
+      <p class="empty-note" id="aylikPastaBosMesaj" style="display:none;">Bu ay hələ xərc yoxdur.</p>
+    </div>
+    <div id="aylikHesabatListesi"></div>
+    <h3 style="font-size:14px; margin:18px 0 10px; color:var(--ink);">Günlük xərc trendi (bu ay)</h3>
+    <div style="background:var(--panel); border:1px solid var(--line); border-radius:var(--radius-lg); padding:14px; margin-bottom:16px;">
+      <canvas id="aylikTrendCanvas" height="160"></canvas>
+    </div>
+    <h3 style="font-size:14px; margin:18px 0 10px; color:var(--ink);">Keçən aya görə</h3>
+    <div id="aylikHesabatTrend"></div>
+    <div class="modal-footer">
+      <button class="btn btn-primary" onclick="aylikHesabatPaneliniKapat()">Bağla</button>
+    </div>
+  </div>
+</div>
+
+<!-- Full transaction history page -->
+<div id="sonEmeliyyatlarModal" class="page-screen">
+  <div class="page-inner">
+    <div class="field-row between" style="border-bottom:1px solid var(--line); padding-bottom:12px; margin-bottom:4px;">
+      <button onclick="sonEmeliyyatlarPaneliniKapat()" style="background:none; border:none; font-size:18px; color:var(--navy-soft); cursor:pointer; padding:0 8px 0 0;">←</button>
+      <h2 style="margin:0; flex:1;">Son əməliyyatlar</h2>
+    </div>
+    <div class="modal-footer" style="justify-content:flex-end; border-top:none; padding-top:0; margin-bottom:6px;">
+      <button class="btn btn-ghost" onclick="listeyiTemizleOnayla()">Hamısını sil</button>
+    </div>
+    <ul id="sonEmeliyyatlarListesi" style="list-style:none; padding:0; margin:0; max-height:65vh; overflow-y:auto;"></ul>
+  </div>
+</div>
+
+<!-- Kredit borcu (taksitli kredit) düzəliş modalı -->
+<div id="krediBorcuDuzeltModal" class="modal">
+  <div class="modal-content">
+    <h2>Kredit borcunu düzəlt</h2>
+    <p class="hint">Aylıq taksit məbləğini, taksit sayını və başlanğıc tarixini özün təyin et.</p>
+    <div style="margin-bottom:12px;">
+      <label style="font-size:12px; color:var(--muted); font-weight:600; display:block; margin-bottom:4px;">Aylıq taksit (AZN)</label>
+      <input type="number" step="0.01" min="0" id="krediBorcuDuzeltMebleg" placeholder="Məs: 550">
+    </div>
+    <div style="margin-bottom:12px;">
+      <label style="font-size:12px; color:var(--muted); font-weight:600; display:block; margin-bottom:4px;">Taksit sayısı</label>
+      <input type="number" step="1" min="1" id="krediBorcuDuzeltSayi" placeholder="Məs: 8">
+    </div>
+    <div style="margin-bottom:6px;">
+      <label style="font-size:12px; color:var(--muted); font-weight:600; display:block; margin-bottom:4px;">Başlanğıc tarixi</label>
+      <input type="date" id="krediBorcuDuzeltBaslangic">
+    </div>
+    <div class="error-text" id="krediBorcuDuzeltError"></div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="modalKapat('krediBorcuDuzeltModal')">Ləğv et</button>
+      <button class="btn btn-primary" onclick="krediBorcuDuzeltOnayla()">Yadda saxla</button>
+    </div>
+  </div>
+</div>
+
+<!-- Hesablar və Borclar page: Cash / Kredi kartı / Debit bank / Deposit + transfer + Güncel Borclar (birləşdirilib) -->
+<div id="hesablarModal" class="page-screen">
+  <div class="page-inner">
+    <div class="field-row between" style="border-bottom:1px solid var(--line); padding-bottom:12px; margin-bottom:4px;">
+      <button onclick="hesablarPaneliniKapat()" style="background:none; border:none; font-size:18px; color:var(--navy-soft); cursor:pointer; padding:0 8px 0 0;">←</button>
+      <h2 style="margin:0; flex:1;">Hesablar və Borclar</h2>
+    </div>
+
+    <!-- Combined debts chart: Kredi kartı borcu + Deposit Borcu + Kredit borcu -->
+    <div class="debt-summary-card">
+      <div class="debt-summary-label">Ümumi borc</div>
+      <div class="debt-summary-amount" id="guncelBorcCemi">0.00 AZN</div>
+      <div class="debt-chart-container" id="guncelBorcQrafik"></div>
+      <div class="debt-breakdown" id="guncelBorcBreakdown"></div>
+    </div>
+
+    <!-- Kredit borcu (taksitli kredit) — konfiqurasiya bu pəncərədən edilir -->
+    <button class="btn btn-primary" id="krediBorcuOdeBtn" onclick="krediBorcuOde()" style="width:100%; margin-bottom:12px;">Bu ayın taksitini ödə (kredit kartından)</button>
+    <p class="hint" id="krediBorcuTarixler">—</p>
+    <div class="ay-total-row" style="margin-bottom:12px;">
+      <span>Aylıq taksit</span>
+      <span style="display:flex; align-items:center; gap:8px;">
+        <span id="krediBorcuMebleg">0.00 AZN</span>
+        <button class="btn btn-ghost" onclick="krediBorcuDuzeltModalAc()" style="padding:5px 10px; font-size:12px;">Düzəlt</button>
+      </span>
+    </div>
+    <div style="display:flex; justify-content:space-between; font-size:12.5px; color:var(--muted); margin-bottom:8px;">
+      <span id="krediBorcuIrəliləyiş">0/0 taksit ödənilib</span>
+      <span id="krediBorcuQalan">Qalıq: 0.00 AZN</span>
+    </div>
+    <div id="krediBorcuAylikQrafik" class="taksit-chart"></div>
+    <div class="error-text" id="krediBorcuError"></div>
+
+    <div class="history-head" style="margin-top:4px;"><span>Son transferlər</span></div>
+    <div id="hesabTransferTarixce" class="modal-list" style="max-height:160px; flex:none;"></div>
+
+    <p class="hint">Hesablarının balansına bax, düzəlt və aralarında transfer et.</p>
+    <div id="hesablarKartlari" class="modal-list" style="gap:10px; flex:none; overflow:visible; max-height:none;"></div>
+    <button class="btn btn-primary" onclick="transferModalAc()" style="width:100%; margin-bottom:14px;">🔁 Hesablar arası transfer</button>
+
+    <div class="modal-footer" style="justify-content:flex-end;">
+      <button class="btn btn-ghost" onclick="hesablarPaneliniKapat()">Bağla</button>
+    </div>
+  </div>
+</div>
+
+<!-- Cash / Debit balance quick-edit modal -->
+<div id="hesabDuzeltModal" class="modal">
+  <div class="modal-content">
+    <h2 id="hesabDuzeltBaslik">Balansı düzəlt</h2>
+    <p class="hint">Bu hesabın hazırkı balansını yaz.</p>
+    <input type="number" step="0.01" id="hesabDuzeltInput" placeholder="0.00">
+    <div class="error-text" id="hesabDuzeltError"></div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="modalKapat('hesabDuzeltModal')">Ləğv et</button>
+      <button class="btn btn-primary" onclick="hesabDuzeltOnayla()">Yadda saxla</button>
+    </div>
+  </div>
+</div>
+
+<!-- Transfer modal -->
+<div id="transferModal" class="modal">
+  <div class="modal-content">
+    <h2>Transfer et</h2>
+    <p class="hint">Bir hesabdan digərinə məbləğ köçür.</p>
+    <div style="margin-bottom:12px;">
+      <label style="font-size:12px; color:var(--muted); font-weight:600; display:block; margin-bottom:4px;">Mənbə hesab</label>
+      <select id="transferMenbe" style="width:100%; padding:9px 10px; border:1px solid #cdd3de; border-radius:8px; font-size:14px;">
+        <option value="nagd">💵 Cash Hesab</option>
+        <option value="debit">🏦 Debit bank Hesabım</option>
+        <option value="depozit">🏛️ Bank Deposit Hesabım</option>
+        <option value="kredit">💳 Kredi kartı Hesabım</option>
+      </select>
+    </div>
+    <div style="margin-bottom:12px;">
+      <label style="font-size:12px; color:var(--muted); font-weight:600; display:block; margin-bottom:4px;">Hədəf hesab</label>
+      <select id="transferHedef" style="width:100%; padding:9px 10px; border:1px solid #cdd3de; border-radius:8px; font-size:14px;">
+        <option value="debit">🏦 Debit bank Hesabım</option>
+        <option value="depozit">🏛️ Bank Deposit Hesabım</option>
+        <option value="kredit">💳 Kredi kartı Hesabım</option>
+        <option value="nagd">💵 Cash Hesab</option>
+      </select>
+    </div>
+    <div style="margin-bottom:6px;">
+      <label style="font-size:12px; color:var(--muted); font-weight:600; display:block; margin-bottom:4px;">Məbləğ (AZN)</label>
+      <input type="number" step="0.01" min="0" id="transferMebleg" placeholder="Məs: 100">
+    </div>
+    <div class="error-text" id="transferError"></div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="modalKapat('transferModal')">Ləğv et</button>
+      <button class="btn btn-primary" onclick="transferOnayla()">Transfer et</button>
+    </div>
+  </div>
+</div>
+
+<script>
+  // v12: bütün rəqəmlər sıfırlanıb — köhnə yerli data görməzdən gəlinir.
+  // Öz məlumatlarını "Backup bərpa et" düyməsi ilə (və ya Drive bağlısansa avtomatik) geri qaytara bilərsən.
+  const STORAGE_KEY = 'gider-takibi-data-v12';
+
+  // ==================== Google Drive avtomatik backup ====================
+  // 1) Google Cloud Console-da OAuth Client ID yarat (Web application tipi) və aşağıya yapışdır.
+  // 2) Bu faylı http(s):// üzərindən aç (file:// işləmir) — o ünvanı Client ID-nin
+  //    "Authorized JavaScript origins" siyahısına əlavə etməlisən.
+  const GOOGLE_DRIVE_CLIENT_ID = '444366545812-753ot3tiqa7upt195uibsm6pdq2tt59g.apps.googleusercontent.com';
+  const DRIVE_SCOPE = 'https://www.googleapis.com/auth/drive.file';
+  const DRIVE_FILE_PREFIX = 'gider-takibi-backup';
+
+  let driveTokenClient = null;
+  let driveAccessToken = null;
+  let driveTokenBitisZamani = 0; // ms epoch
+  let driveBagli = localStorage.getItem('drive_bagli') === '1';
+  let driveSonSync = localStorage.getItem('drive_son_sync') || null;
+  let driveSyncGedirmi = false;
+  let driveGeriCagirisFn = null;
+  let sonDeyisiklikVaxti = null; // yerli son dəyişiklik vaxtı (ISO) - Drive ilə müqayisə üçün
+
+  // Avtomatik sinxronizasiya: hər dəyişiklikdən bir neçə saniyə sonra (debounce ilə)
+  // sakitcə tək bir "auto" faylını Drive-da yeniləyir (hər dəfə yeni fayl yaratmır).
+  let driveOtomatikSync = localStorage.getItem('drive_auto_sync') === '1';
+  let driveAutoFileId = localStorage.getItem('drive_auto_file_id') || null;
+  let driveAutoTimer = null;
+
+  // ==================== Tema (Dark mode) ====================
+  function temaTetbiqEt(tema) {
+    document.documentElement.setAttribute('data-theme', tema === 'dark' ? 'dark' : 'light');
+    const lbl = document.getElementById('temaLabel');
+    if (lbl) lbl.innerText = tema === 'dark' ? '☀️ İşıqlı rejim' : '🌙 Qaranlıq rejim';
+  }
+  function temaDeyis() {
+    const cari = localStorage.getItem('tema') === 'dark' ? 'dark' : 'light';
+    const yeni = cari === 'dark' ? 'light' : 'dark';
+    localStorage.setItem('tema', yeni);
+    temaTetbiqEt(yeni);
+  }
+  (function temaIlkYukleme() {
+    const saxlanan = localStorage.getItem('tema');
+    const tema = saxlanan ? saxlanan : (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
+    temaTetbiqEt(tema);
+  })();
+  // ==================== /Tema ====================
+
+  // ==================== Tətbiq kilidi (Face ID / Touch ID / PIN) ====================
+  let kilidVar = localStorage.getItem('kilit_aktiv') === '1';
+  let kilidCredentialId = localStorage.getItem('kilit_webauthn_id') || null;
+  let kilidPin = localStorage.getItem('kilit_pin') || null;
+
+  function kilidYoxla() {
+    if (!kilidVar) return;
+    const ekran = document.getElementById('kilidEkrani');
+    const faceBtn = document.getElementById('kilidFaceBtn');
+    const pinWrap = document.getElementById('kilidPinWrap');
+    const hint = document.getElementById('kilidHint');
+    ekran.classList.add('active');
+    if (kilidCredentialId && window.PublicKeyCredential) {
+      faceBtn.style.display = 'block';
+      pinWrap.style.display = kilidPin ? 'none' : 'none';
+      hint.innerText = 'Davam etmək üçün Face ID / Touch ID ilə təsdiqlə.';
+      setTimeout(kilidWebAuthnDogrula, 350); // avtomatik sına — bəzi brauzerlər düymə klikini gözləyəcək
+    } else {
+      faceBtn.style.display = 'none';
+      pinWrap.style.display = 'block';
+      hint.innerText = 'Davam etmək üçün PIN kodunu yaz.';
+    }
+  }
+
+  function kilidAc() {
+    document.getElementById('kilidEkrani').classList.remove('active');
+    document.getElementById('kilidError').innerText = '';
+  }
+
+  async function kilidWebAuthnDogrula() {
+    const errEl = document.getElementById('kilidError');
+    errEl.innerText = '';
+    if (!kilidCredentialId || !window.PublicKeyCredential) {
+      document.getElementById('kilidPinWrap').style.display = 'block';
+      return;
+    }
+    try {
+      const idBytes = Uint8Array.from(atob(kilidCredentialId), c => c.charCodeAt(0));
+      const challenge = crypto.getRandomValues(new Uint8Array(32));
+      await navigator.credentials.get({
+        publicKey: { challenge, allowCredentials: [{ id: idBytes, type: 'public-key' }], userVerification: 'required', timeout: 60000 }
+      });
+      kilidAc();
+    } catch (e) {
+      errEl.innerText = 'Təsdiqlənmədi. Yenidən sına və ya PIN istifadə et.';
+      if (kilidPin) document.getElementById('kilidPinWrap').style.display = 'block';
+    }
+  }
+
+  function kilidPinIleAc() {
+    const val = document.getElementById('kilidPinInput').value.trim();
+    if (kilidPin && val === kilidPin) {
+      document.getElementById('kilidPinInput').value = '';
+      kilidAc();
+    } else {
+      document.getElementById('kilidError').innerText = 'Yanlış PIN.';
+    }
+  }
+
+  function kilidAyarGoster() {
+    const sw = document.getElementById('kilidAyarSwitch');
+    const lbl = document.getElementById('kilidAyarLabel');
+    if (!sw) return;
+    sw.classList.toggle('on', kilidVar);
+    lbl.innerText = kilidVar ? '🔒 Tətbiq kilidi (aktiv)' : '🔒 Tətbiq kilidi (Face ID / PIN)';
+    document.getElementById('kilidAyarError').innerText = '';
+  }
+
+  function kilidToggle() {
+    if (kilidVar) {
+      confirmAc('Kilidi söndür', 'Tətbiq kilidini deaktiv etmək istəyirsən?', () => {
+        kilidVar = false; kilidCredentialId = null; kilidPin = null;
+        localStorage.removeItem('kilit_aktiv');
+        localStorage.removeItem('kilit_webauthn_id');
+        localStorage.removeItem('kilit_pin');
+        kilidAyarGoster();
+      });
+    } else {
+      kilidKurulumBaslat();
+    }
+  }
+
+  async function kilidKurulumBaslat() {
+    const errEl = document.getElementById('kilidAyarError');
+    errEl.innerText = '';
+    if (location.protocol !== 'https:' && location.hostname !== 'localhost') {
+      errEl.innerText = 'Face ID/Touch ID üçün tətbiq https:// üzərindən açılmalıdır. Hələlik PIN qurulur.';
+      pinAyarlaModalAc();
+      return;
+    }
+    if (window.PublicKeyCredential) {
+      try {
+        const available = await PublicKeyCredential.isUserVerifyingPlatformAuthenticatorAvailable();
+        if (available) {
+          const challenge = crypto.getRandomValues(new Uint8Array(32));
+          const userId = crypto.getRandomValues(new Uint8Array(16));
+          const cred = await navigator.credentials.create({
+            publicKey: {
+              challenge,
+              rp: { name: 'Günlük Xərclər' },
+              user: { id: userId, name: 'istifadeci', displayName: 'Tətbiq istifadəçisi' },
+              pubKeyCredParams: [{ type: 'public-key', alg: -7 }, { type: 'public-key', alg: -257 }],
+              authenticatorSelection: { authenticatorAttachment: 'platform', userVerification: 'required', residentKey: 'preferred' },
+              timeout: 60000
+            }
+          });
+          kilidCredentialId = btoa(String.fromCharCode(...new Uint8Array(cred.rawId)));
+          localStorage.setItem('kilit_webauthn_id', kilidCredentialId);
+          kilidVar = true;
+          localStorage.setItem('kilit_aktiv', '1');
+          kilidAyarGoster();
+          return;
+        }
+      } catch (e) {
+        console.warn('WebAuthn qurulmadı, PIN-ə keçilir:', e);
+      }
+    }
+    pinAyarlaModalAc();
+  }
+
+  function pinAyarlaModalAc() {
+    document.getElementById('pinAyarlaInput').value = '';
+    document.getElementById('pinAyarlaError').innerText = '';
+    modalAc('pinAyarlaModal');
+  }
+  function pinAyarlaOnayla() {
+    const val = document.getElementById('pinAyarlaInput').value.trim();
+    if (!/^\d{4}$/.test(val)) {
+      document.getElementById('pinAyarlaError').innerText = '4 rəqəmli bir PIN yaz.';
+      return;
+    }
+    kilidPin = val;
+    localStorage.setItem('kilit_pin', val);
+    kilidVar = true;
+    localStorage.setItem('kilit_aktiv', '1');
+    modalKapat('pinAyarlaModal');
+    kilidAyarGoster();
+  }
+  // ==================== /Tətbiq kilidi ====================
+
+  function driveLog(msg) {
+    console.log('[Drive]', msg);
+    const el = document.getElementById('driveDebug');
+    if (el) el.innerText = msg;
+  }
+
+  function driveTokenClientHazirla() {
+    if (driveTokenClient) return;
+    if (typeof google === 'undefined' || !google.accounts) return; // GIS hələ yüklənməyib
+    driveTokenClient = google.accounts.oauth2.initTokenClient({
+      client_id: GOOGLE_DRIVE_CLIENT_ID,
+      scope: DRIVE_SCOPE,
+      callback: (resp) => {
+        if (resp && resp.access_token) {
+          driveAccessToken = resp.access_token;
+          driveTokenBitisZamani = Date.now() + (Number(resp.expires_in || 3600) - 60) * 1000;
+          driveBagli = true;
+          localStorage.setItem('drive_bagli', '1');
+          const cb = driveGeriCagirisFn; driveGeriCagirisFn = null;
+          driveMenyuGuncelle();
+          if (cb) cb();
+        } else {
+          driveMenyuGuncelle('Giriş alınmadı, yenidən sına.', true);
+        }
+      },
+      error_callback: () => driveMenyuGuncelle('Giriş alınmadı, yenidən sına.', true)
+    });
+  }
+
+  function driveTokenGerekliyse(sessiz, sonra) {
+    driveTokenClientHazirla();
+    if (!driveTokenClient) { driveLog('GIS kitabxanası hələ hazır deyil, gözlənilir…'); setTimeout(() => driveTokenGerekliyse(sessiz, sonra), 400); return; }
+    if (driveAccessToken && Date.now() < driveTokenBitisZamani) { driveLog('Mövcud token istifadə olunur (yenisi lazım deyil).'); sonra(); return; }
+    driveLog(sessiz ? 'Sakit token sorğusu göndərilir (istifadəçi görməyəcək)…' : 'Google giriş pəncərəsi açılır…');
+    driveGeriCagirisFn = sonra;
+    driveTokenClient.requestAccessToken({ prompt: sessiz ? '' : 'consent' });
+  }
+
+  function driveBaglan() {
+    if (GOOGLE_DRIVE_CLIENT_ID.indexOf('BURAYA_OZ_CLIENT_ID') === 0) {
+      alert('Əvvəlcə kodun içindəki GOOGLE_DRIVE_CLIENT_ID sətrinə öz Google Client ID-ni yazmalısan.');
+      return;
+    }
+    driveTokenGerekliyse(false, () => driveMenyuGuncelle());
+  }
+
+  function driveBaglantiKes() {
+    confirmAc('Drive bağlantısını kəs', 'Drive bağlantısı kəsilsin? Drive-dakı fayl silinmir.', () => {
+      driveBagli = false; driveAccessToken = null; driveTokenBitisZamani = 0;
+      localStorage.setItem('drive_bagli', '0');
+      driveMenyuGuncelle();
+      menuKapat();
+    });
+  }
+
+  function driveMenyuGuncelle(mesaj, xetaMi) {
+    const statusEl = document.getElementById('driveStatus');
+    const subEl = document.getElementById('driveSub');
+    const btnsEl = document.getElementById('driveBtns');
+    if (!statusEl) return;
+    if (!driveBagli) {
+      statusEl.className = 'drive-status' + (xetaMi ? ' err' : '');
+      statusEl.innerText = xetaMi ? ('⚠️ ' + mesaj) : '☁️ Google Drive-a bağlı deyil';
+      subEl.innerText = 'Bağlansan, "Göndər" və "Çək" düymələri ilə məlumatını özün idarə edə biləcəksən (istəsən avtomatik da qura bilərsən).';
+      btnsEl.innerHTML = '<button onclick="driveBaglan()">Bağlan</button>';
+      const autoRowHide = document.getElementById('driveAutoRow');
+      if (autoRowHide) autoRowHide.style.display = 'none';
+      return;
+    }
+    if (driveSyncGedirmi) {
+      statusEl.className = 'drive-status';
+      statusEl.innerText = '☁️ Əməliyyat gedir…';
+    } else if (xetaMi) {
+      statusEl.className = 'drive-status err';
+      statusEl.innerText = '⚠️ ' + mesaj;
+    } else {
+      statusEl.className = 'drive-status ok';
+      statusEl.innerText = '✅ Drive-a bağlı';
+    }
+    subEl.innerText = driveSonSync ? ('Son əməliyyat: ' + driveSonSync) : 'Hələ göndərilməyib/çəkilməyib.';
+    btnsEl.innerHTML = '<button onclick="driveManualGonder()">📤 Drive-a göndər</button><button onclick="driveManualCek()">📥 Drive-dan çək</button><button onclick="driveBaglantiKes()">Bağlantını kəs</button>';
+    const autoRowEl = document.getElementById('driveAutoRow');
+    if (autoRowEl) {
+      autoRowEl.style.display = 'flex';
+      const cb = document.getElementById('driveAutoSyncCheckbox');
+      if (cb) cb.checked = driveOtomatikSync;
+    }
+  }
+
+  function driveBackupVerisi() {
+    return { kategoriler, giderler, anaHesap, kreditLimit, krediBorcu, nagdBakiye, debitBakiye, depozitBakiye, hesabTransferleri, gunlukLimit, backupTarixi: sonDeyisiklikVaxti || new Date().toISOString() };
+  }
+
+  function driveYeniBackupAdi() {
+    const s = new Date();
+    const pad = n => String(n).padStart(2, '0');
+    return `${DRIVE_FILE_PREFIX}_${s.getFullYear()}-${pad(s.getMonth() + 1)}-${pad(s.getDate())}_${pad(s.getHours())}-${pad(s.getMinutes())}.json`;
+  }
+
+  function driveTarixSaatFormat(iso) {
+    const d = new Date(iso);
+    const pad = n => String(n).padStart(2, '0');
+    return pad(d.getDate()) + '.' + pad(d.getMonth() + 1) + '.' + d.getFullYear() + ' · ' + pad(d.getHours()) + ':' + pad(d.getMinutes());
+  }
+
+  async function driveFayliOxu(fileId) {
+    const res = await fetch(`https://www.googleapis.com/drive/v3/files/${fileId}?alt=media`, {
+      headers: { Authorization: 'Bearer ' + driveAccessToken }
+    });
+    if (!res.ok) throw new Error('download-failed:' + res.status);
+    return await res.json();
+  }
+
+  function driveVerisiniTetbiqEt(parsed) {
+    kategoriler = parsed.kategoriler || varsayilanKategoriler;
+    giderler = parsed.giderler || [];
+    anaHesap = (typeof parsed.anaHesap === 'number') ? parsed.anaHesap : null;
+    kreditLimit = (typeof parsed.kreditLimit === 'number') ? parsed.kreditLimit : null;
+    krediBorcu = parsed.krediBorcu || krediBorcuKohnaBackupdanCixar(parsed.aylikXerclar);
+    nagdBakiye = (typeof parsed.nagdBakiye === 'number') ? parsed.nagdBakiye : 0;
+    debitBakiye = (typeof parsed.debitBakiye === 'number') ? parsed.debitBakiye : 0;
+    depozitBakiye = (typeof parsed.depozitBakiye === 'number') ? parsed.depozitBakiye : 0;
+    hesabTransferleri = parsed.hesabTransferleri || [];
+    gunlukLimit = (typeof parsed.gunlukLimit === 'number') ? parsed.gunlukLimit : 20;
+    sonDeyisiklikVaxti = parsed.backupTarixi || new Date().toISOString();
+    try {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify({ kategoriler, giderler, anaHesap, kreditLimit, krediBorcu, nagdBakiye, debitBakiye, depozitBakiye, hesabTransferleri, gunlukLimit, sonDeyisiklikVaxti }));
+    } catch (e) { console.error('Yadda saxlama xətası:', e); }
+  }
+
+  // Drive-dakı bütün "gider-takibi-backup_*" fayllarını (ən yenidən köhnəyə) qaytarır.
+  async function driveBackupFayllariniListele() {
+    const q = encodeURIComponent(`name contains '${DRIVE_FILE_PREFIX}' and trashed=false`);
+    const res = await fetch(`https://www.googleapis.com/drive/v3/files?q=${q}&spaces=drive&fields=files(id,name,createdTime)&orderBy=createdTime desc`, {
+      headers: { Authorization: 'Bearer ' + driveAccessToken }
+    });
+    if (!res.ok) throw new Error('list-failed');
+    const data = await res.json();
+    return data.files || [];
+  }
+
+  // Hər göndərişdə köhnəni əvəz etmək əvəzinə tarix/saat möhürlü YENİ fayl yaradır.
+  async function driveYukleEt() {
+    const data = driveBackupVerisi();
+    const boundary = 'gidertakibi_' + Date.now();
+    const metadata = { name: driveYeniBackupAdi(), mimeType: 'application/json' };
+    const body =
+      `--${boundary}\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n${JSON.stringify(metadata)}\r\n` +
+      `--${boundary}\r\nContent-Type: application/json\r\n\r\n${JSON.stringify(data)}\r\n` +
+      `--${boundary}--`;
+    const res = await fetch(`https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart`, {
+      method: 'POST',
+      headers: { Authorization: 'Bearer ' + driveAccessToken, 'Content-Type': `multipart/related; boundary="${boundary}"` },
+      body
+    });
+    if (!res.ok) throw new Error('upload-failed:' + res.status);
+    return await res.json();
+  }
+
+  function driveOtomatikSyncToggle(checked) {
+    driveOtomatikSync = checked;
+    localStorage.setItem('drive_auto_sync', checked ? '1' : '0');
+    if (checked) driveOtomatikPlanla();
+  }
+
+  // Hər veriKaydet() çağırışında işə düşür, amma 4 saniyə "sakitlik" gözləyir ki,
+  // ard-arda bir neçə dəyişiklik edildikdə hər biri üçün ayrı sorğu getməsin.
+  function driveOtomatikPlanla() {
+    if (!driveBagli || !driveOtomatikSync) return;
+    clearTimeout(driveAutoTimer);
+    driveAutoTimer = setTimeout(driveOtomatikCalistir, 4000);
+  }
+
+  function driveOtomatikCalistir() {
+    if (!driveBagli || !driveOtomatikSync || driveSyncGedirmi) return;
+    driveTokenGerekliyse(true, async () => { // sessiz — istifadəçiyə pəncərə göstərmir
+      try {
+        await driveAutoYukleEt();
+        driveSonSyncQeydEt();
+        driveMenyuGuncelle();
+      } catch (e) {
+        driveMenyuGuncelle('Avtomatik göndərmə alınmadı.', true);
+      }
+    });
+  }
+
+  // Hər dəyişiklikdə YENİ fayl yaratmaq əvəzinə, tək bir "auto" faylını yerində yeniləyir.
+  // (Manual "Drive-a göndər" düyməsi isə hələ də tarix-möhürlü ayrıca versiyalar yaradır.)
+  async function driveAutoYukleEt() {
+    const data = driveBackupVerisi();
+    const body = JSON.stringify(data);
+    if (driveAutoFileId) {
+      const res = await fetch(`https://www.googleapis.com/upload/drive/v3/files/${driveAutoFileId}?uploadType=media`, {
+        method: 'PATCH',
+        headers: { Authorization: 'Bearer ' + driveAccessToken, 'Content-Type': 'application/json' },
+        body
+      });
+      if (res.status === 404) {
+        driveAutoFileId = null;
+        localStorage.removeItem('drive_auto_file_id');
+        return driveAutoYukleEt();
+      }
+      if (!res.ok) throw new Error('auto-upload-failed:' + res.status);
+      return await res.json();
+    }
+    const boundary = 'gidertakibi_auto_' + Date.now();
+    const metadata = { name: DRIVE_FILE_PREFIX + '_auto.json', mimeType: 'application/json' };
+    const multipartBody =
+      `--${boundary}\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n${JSON.stringify(metadata)}\r\n` +
+      `--${boundary}\r\nContent-Type: application/json\r\n\r\n${body}\r\n` +
+      `--${boundary}--`;
+    const res = await fetch(`https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart`, {
+      method: 'POST',
+      headers: { Authorization: 'Bearer ' + driveAccessToken, 'Content-Type': `multipart/related; boundary="${boundary}"` },
+      body: multipartBody
+    });
+    if (!res.ok) throw new Error('auto-create-failed:' + res.status);
+    const json = await res.json();
+    driveAutoFileId = json.id;
+    localStorage.setItem('drive_auto_file_id', driveAutoFileId);
+    return json;
+  }
+
+  function driveSonSyncQeydEt() {
+    const simdi = new Date();
+    driveSonSync = simdi.toLocaleTimeString('az-AZ', { hour: '2-digit', minute: '2-digit' }) + ' · ' + simdi.toLocaleDateString('az-AZ');
+    localStorage.setItem('drive_son_sync', driveSonSync);
+  }
+
+  // İstifadəçi özü basanda işə düşür — heç bir avtomatik/sakit gözləmə yoxdur.
+  // Token artıq yaddaşdadırsa dərhal davam edir; deyilsə, bir dəfə görünən Google
+  // pəncərəsi açılır (bu, istifadəçi kliki ilə açıldığı üçün brauzer bunu bloklamır).
+  // Hər göndəriş köhnə backup-ın üstünə yazmır — tarix/saat möhürü ilə YENİ fayl yaradır.
+  function driveManualGonder() {
+    if (!driveBagli) { driveBaglan(); return; }
+    if (driveSyncGedirmi) return;
+    driveSyncGedirmi = true;
+    driveMenyuGuncelle();
+    driveTokenGerekliyse(false, async () => {
+      try {
+        await driveYukleEt();
+        driveSonSyncQeydEt();
+        driveSyncGedirmi = false;
+        driveMenyuGuncelle();
+      } catch (e) {
+        driveSyncGedirmi = false;
+        driveMenyuGuncelle('Göndərmə alınmadı: ' + (e && e.message ? e.message : e), true);
+      }
+    });
+  }
+
+  // Drive-dakı bütün backupları siyahılayır ki, istifadəçi hansını çəkəcəyini özü seçsin.
+  function driveManualCek() {
+    if (!driveBagli) { driveBaglan(); return; }
+    if (driveSyncGedirmi) return;
+    driveSyncGedirmi = true;
+    driveMenyuGuncelle();
+    driveTokenGerekliyse(false, async () => {
+      try {
+        const fayllar = await driveBackupFayllariniListele();
+        driveSyncGedirmi = false;
+        driveMenyuGuncelle();
+        if (!fayllar.length) {
+          driveMenyuGuncelle('Drive-da hələ heç bir backup tapılmadı.', true);
+          return;
+        }
+        driveBackupSecimGoster(fayllar);
+      } catch (e) {
+        driveSyncGedirmi = false;
+        driveMenyuGuncelle('Siyahı alınmadı: ' + (e && e.message ? e.message : e), true);
+      }
+    });
+  }
+
+  function driveBackupSecimGoster(fayllar) {
+    const konteyner = document.getElementById('driveBackupSecListesi');
+    konteyner.innerHTML = '';
+    fayllar.forEach(f => {
+      const item = document.createElement('div');
+      item.className = 'modal-item';
+      item.style.cursor = 'pointer';
+      item.innerHTML = `<div class="field-row between"><span>🗓️ ${driveTarixSaatFormat(f.createdTime)}</span><span style="color:var(--navy-soft); font-size:12px; font-weight:600;">Seç →</span></div>`;
+      item.onclick = () => driveBackupSecildi(f.id, f.createdTime);
+      konteyner.appendChild(item);
+    });
+    modalAc('driveBackupSecModal');
+  }
+
+  function driveBackupSecildi(fileId, createdTime) {
+    modalKapat('driveBackupSecModal');
+    confirmAc('Bu backup tətbiq edilsin?', driveTarixSaatFormat(createdTime) + ' tarixli backup cari məlumatının üstünə yazılsın? Bu geri qaytarıla bilməz.', () => {
+      driveSyncGedirmi = true;
+      driveMenyuGuncelle();
+      driveTokenGerekliyse(false, async () => {
+        try {
+          const remote = await driveFayliOxu(fileId);
+          driveVerisiniTetbiqEt(remote);
+          ekraniGuncelle();
+          const hesablarModalEl = document.getElementById('hesablarModal');
+          if (hesablarModalEl && hesablarModalEl.classList.contains('active') && typeof hesablarGoster === 'function') {
+            hesablarGoster();
+            if (typeof krediBorcuGoster === 'function') krediBorcuGoster();
+          }
+          driveSonSyncQeydEt();
+          driveSyncGedirmi = false;
+          driveMenyuGuncelle();
+        } catch (e) {
+          driveSyncGedirmi = false;
+          driveMenyuGuncelle('Tətbiq alınmadı: ' + (e && e.message ? e.message : e), true);
+        }
+      });
+    });
+  }
+  // ==================== /Google Drive ====================
+  let aktifDonem = 'gunluk';
+  let goruntulenenTarix = new Date(); goruntulenenTarix.setHours(0, 0, 0, 0);
+  let kategoriler = [];
+  let giderler = [];
+  let anaHesap = null; // borc (kredit kartı balansı, mənfi ədəd kimi saxlanılır)
+  let kreditLimit = null; // kredit kartının limiti
+  let krediBorcu = null; // taksitli kredit (ayrıca bölmə) — istifadəçi "Düzəlt" ilə özü təyin edir
+  let nagdBakiye = 0; // Cash Hesab
+  let debitBakiye = 0; // Debit bank Hesabım
+  let depozitBakiye = 0; // Bank Deposit Hesabım
+  let hesabTransferleri = []; // hesablar arası transfer tarixçəsi
+  let gunlukLimit = 20; // gündəlik xərc limiti — "Ayarlar" bölməsindən dəyişdirilir
+  let veriYuklendi = false;
+  let aylikPastaChart = null; // Chart.js: kateqoriya dağılımı (pasta)
+  let aylikTrendChart = null; // Chart.js: günlük xərc trendi (xətt)
+
+  function cssVar(ad) {
+    return getComputedStyle(document.documentElement).getPropertyValue(ad).trim();
+  }
+  const renkPaleti = ['#1f2a44','#c99a3a','#3d7068','#8b5f8f','#b5533f','#4a6fa5','#7a8450','#a35c7a'];
+
+  const varsayilanKategoriler = [
+    { ad: 'Bus', sabitTutar: null, renk: '#1f2a44', ikon: '🚌' },
+    { ad: 'Metro', sabitTutar: null, renk: '#c99a3a', ikon: '🚇' },
+    { ad: 'Coffee', sabitTutar: null, renk: '#3d7068', ikon: '☕️' },
+    { ad: 'Sigaret', sabitTutar: null, renk: '#8b5f8f', ikon: '🚬' },
+    { ad: 'Market', sabitTutar: null, renk: '#b5533f', ikon: '🛒' },
+    { ad: 'Breakfast', sabitTutar: null, renk: '#4a6fa5', ikon: '🥐' },
+    { ad: 'Dinner', sabitTutar: null, renk: '#7a8450', ikon: '🍔' },
+    { ad: 'Lunch', sabitTutar: null, renk: '#a35c7a', ikon: '🍽️' }
+  ];
+
+  const varsayilanGiderler = [];
+
+  function idUret() {
+    return 'ay_' + Date.now().toString(36) + '_' + Math.random().toString(36).slice(2, 8);
+  }
+
+  // Aylıq xərclər bölməsi ləğv olunub. Köhnə backuplarda kredit borcu bəzən həmin
+  // siyahının içində saxlanılırdı — mövcud krediBorcu yoxdursa, oradan çıxarırıq.
+  function krediBorcuKohnaBackupdanCixar(eskiAylikXerclar) {
+    if (!Array.isArray(eskiAylikXerclar)) return null;
+    const KREDI_BORCU_ID = 'kredi_borcu_2026_09';
+    const eski = eskiAylikXerclar.find(x => x.id === KREDI_BORCU_ID);
+    if (!eski) return null;
+    return {
+      id: KREDI_BORCU_ID, ad: 'Kredi Borcu', aylikMebleg: (typeof eski.tutar === 'number') ? eski.tutar : 0,
+      baslangic: eski.baslangic || null, bitis: eski.bitis || null, taksitSayi: eski.taksitSayi || 0,
+      odenmisTaksitSayi: eski.odenmisTaksitSayi || 0, sonOdenenAy: eski.sonOdenenAy || null,
+      odenenMebleg: eski.odenenMebleg || null
+    };
+  }
+
+  async function veriYukle() {
+    try {
+      const raw = localStorage.getItem(STORAGE_KEY);
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        kategoriler = parsed.kategoriler || varsayilanKategoriler;
+        giderler = parsed.giderler || [];
+        anaHesap = (typeof parsed.anaHesap === 'number') ? parsed.anaHesap : null;
+        kreditLimit = (typeof parsed.kreditLimit === 'number') ? parsed.kreditLimit : null;
+        krediBorcu = parsed.krediBorcu || krediBorcuKohnaBackupdanCixar(parsed.aylikXerclar);
+        nagdBakiye = (typeof parsed.nagdBakiye === 'number') ? parsed.nagdBakiye : 0;
+        debitBakiye = (typeof parsed.debitBakiye === 'number') ? parsed.debitBakiye : 0;
+        depozitBakiye = (typeof parsed.depozitBakiye === 'number') ? parsed.depozitBakiye : 0;
+        hesabTransferleri = parsed.hesabTransferleri || [];
+        gunlukLimit = (typeof parsed.gunlukLimit === 'number') ? parsed.gunlukLimit : 20;
+        sonDeyisiklikVaxti = parsed.sonDeyisiklikVaxti || null;
+      } else {
+        kategoriler = varsayilanKategoriler;
+        giderler = varsayilanGiderler.map(g => ({ ...g }));
+        anaHesap = null;
+        kreditLimit = null;
+        krediBorcu = null;
+        nagdBakiye = 0;
+        debitBakiye = 0;
+        depozitBakiye = 0;
+        hesabTransferleri = [];
+        gunlukLimit = 20;
+        sonDeyisiklikVaxti = null;
+      }
+    } catch (e) {
+      kategoriler = varsayilanKategoriler;
+      giderler = varsayilanGiderler.map(g => ({ ...g }));
+      anaHesap = null;
+      kreditLimit = null;
+      krediBorcu = null;
+      nagdBakiye = 0;
+      debitBakiye = 0;
+      depozitBakiye = 0;
+      hesabTransferleri = [];
+      gunlukLimit = 20;
+    }
+    veriYuklendi = true;
+    appIskeletiOlustur();
+    ekraniGuncelle();
+    driveMenyuGuncelle();
+  }
+
+  async function veriKaydet() {
+    try {
+      sonDeyisiklikVaxti = new Date().toISOString();
+      localStorage.setItem(STORAGE_KEY, JSON.stringify({ kategoriler, giderler, anaHesap, kreditLimit, krediBorcu, nagdBakiye, debitBakiye, depozitBakiye, hesabTransferleri, gunlukLimit, sonDeyisiklikVaxti }));
+      driveOtomatikPlanla();
+    } catch (e) {
+      console.error('Yadda saxlama xətası:', e);
+    }
+  }
+
+  // ---- Backup: JSON endir / bərpa et ----
+  function backupIndir() {
+    const data = { kategoriler, giderler, anaHesap, kreditLimit, krediBorcu, nagdBakiye, debitBakiye, depozitBakiye, hesabTransferleri, gunlukLimit, backupTarixi: new Date().toISOString() };
+    const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const tarixEtiket = new Date().toISOString().slice(0, 10);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `gider-backup-${tarixEtiket}.json`;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+    menuKapat();
+  }
+
+  function backupBerpaEt(event) {
+    const file = event.target.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      try {
+        const parsed = JSON.parse(e.target.result);
+        confirmAc('Backup bərpa et', 'Mövcud bütün data bu fayldakı ilə əvəz olunacaq. Davam edilsin?', () => {
+          kategoriler = parsed.kategoriler || varsayilanKategoriler;
+          giderler = parsed.giderler || [];
+          anaHesap = (typeof parsed.anaHesap === 'number') ? parsed.anaHesap : null;
+          kreditLimit = (typeof parsed.kreditLimit === 'number') ? parsed.kreditLimit : null;
+          krediBorcu = parsed.krediBorcu || krediBorcuKohnaBackupdanCixar(parsed.aylikXerclar);
+          nagdBakiye = (typeof parsed.nagdBakiye === 'number') ? parsed.nagdBakiye : 0;
+          debitBakiye = (typeof parsed.debitBakiye === 'number') ? parsed.debitBakiye : 0;
+          depozitBakiye = (typeof parsed.depozitBakiye === 'number') ? parsed.depozitBakiye : 0;
+          hesabTransferleri = parsed.hesabTransferleri || [];
+          gunlukLimit = (typeof parsed.gunlukLimit === 'number') ? parsed.gunlukLimit : 20;
+          veriKaydet();
+          ekraniGuncelle();
+          menuKapat();
+        });
+      } catch (err) {
+        alert('Fayl oxuna bilmədi. Düzgün JSON backup faylı seçdiyinə əmin ol.');
+      }
+    };
+    reader.readAsText(file);
+    event.target.value = '';
+  }
+
+  function appIskeletiOlustur() {
+    document.getElementById('app').innerHTML = `
+      <div class="top">
+        <button class="hamburger-btn" onclick="menuAc()">☰</button>
+        <h1>Günlük Xərclər</h1>
+        <span style="width:38px;"></span>
+      </div>
+      <div class="date-nav">
+        <button class="date-nav-arrow" id="tarixGeriBtn" onclick="tarixDeyis(-1)">‹</button>
+        <div class="date-nav-label" id="tarixEtiketi">Bugün · 05.09.2026</div>
+        <button class="date-nav-arrow" id="tarixIrəliBtn" onclick="tarixDeyis(1)">›</button>
+      </div>
+      <div class="summary-card">
+        <div class="summary-label" id="donemBaslik">Bugünkü ümumi xərc</div>
+        <div class="summary-amount" id="toplamTutar">0.00 AZN</div>
+        <div class="summary-sub" id="donemAlt"></div>
+        <div id="progressCubuk" class="progress-bar-container"></div>
+        <div id="breakdown" class="breakdown"></div>
+      </div>
+      <div class="daily-limit-card" id="gunlukLimitKart">
+        <div class="daily-limit-head">
+          <span class="lbl" id="gunlukLimitLbl">Günlük limit: 20.00 AZN</span>
+          <span class="pct" id="gunlukLimitYuzde">%0</span>
+        </div>
+        <div class="daily-limit-bar-bg"><div class="daily-limit-bar-fill" id="gunlukLimitBar" style="width:0%"></div></div>
+        <div class="daily-limit-foot">
+          <span>Xərclənib: <b id="gunlukLimitXerc">0.00 AZN</b></span>
+          <span class="qalan" id="gunlukLimitQalan">Qalıq: 20.00 AZN</span>
+        </div>
+      </div>
+      <div class="insight-strip">
+        <div class="insight-box">
+          <div class="k">Günlük ortalama</div>
+          <div class="v" id="insightOrtalama">0.00 AZN</div>
+        </div>
+        <div class="insight-box">
+          <div class="k">Ən çox xərc</div>
+          <div class="v" id="insightTopKategori">—</div>
+        </div>
+      </div>
+      <div id="butonlarKonteyneri" class="grid-buttons"></div>
+      <button class="dashed-btn" onclick="islemFormModalAc(null)">🕓 Köhnə tarixli xərc əlavə et</button>
+    `;
+  }
+
+  function donemeGoreFiltrele() {
+    return giderler.filter(g => {
+      if (g.aylikRef) return false; // aylıq xərclər / kredit borcu ödəmələri yalnız kredit kartına yansır
+      const t = new Date(g.tamTarix);
+      return t.toDateString() === goruntulenenTarix.toDateString();
+    });
+  }
+
+  function gunSayisi() {
+    return 1;
+  }
+
+  function tarixBugunmu(tarix) {
+    const bugun = new Date(); bugun.setHours(0, 0, 0, 0);
+    return tarix.toDateString() === bugun.toDateString();
+  }
+
+  function tarixDunenmi(tarix) {
+    const dunen = new Date(); dunen.setDate(dunen.getDate() - 1); dunen.setHours(0, 0, 0, 0);
+    return tarix.toDateString() === dunen.toDateString();
+  }
+
+  function tarixFormatla(tarix) {
+    return tarix.toLocaleDateString('az-AZ', { day: '2-digit', month: '2-digit', year: 'numeric' });
+  }
+
+  function tarixDeyis(delta) {
+    const yeni = new Date(goruntulenenTarix);
+    yeni.setDate(yeni.getDate() + delta);
+    const bugun = new Date(); bugun.setHours(0, 0, 0, 0);
+    if (yeni > bugun) return; // gələcəyə keçmək olmaz
+    goruntulenenTarix = yeni;
+    ekraniGuncelle();
+  }
+
+  function gunlukLimitGuncelle(bugunkuToplam) {
+    const limit = (typeof gunlukLimit === 'number' && gunlukLimit > 0) ? gunlukLimit : 0;
+    const yuzde = limit > 0 ? (bugunkuToplam / limit) * 100 : 0;
+    const asilib = bugunkuToplam > limit;
+    const qalan = limit - bugunkuToplam;
+
+    const lblEl = document.getElementById('gunlukLimitLbl');
+    lblEl.innerText = 'Günlük limit: ' + limit.toFixed(2) + ' AZN';
+    lblEl.classList.toggle('over', asilib);
+
+    const pctEl = document.getElementById('gunlukLimitYuzde');
+    pctEl.innerText = '%' + yuzde.toFixed(0);
+    pctEl.classList.toggle('over', asilib);
+
+    document.getElementById('gunlukLimitXerc').innerText = bugunkuToplam.toFixed(2) + ' AZN';
+
+    const barEl = document.getElementById('gunlukLimitBar');
+    barEl.style.width = Math.min(yuzde, 100) + '%';
+    barEl.classList.toggle('over', asilib);
+
+    const qalanEl = document.getElementById('gunlukLimitQalan');
+    qalanEl.classList.toggle('over', asilib);
+    qalanEl.innerText = asilib
+      ? ('Limit aşıldı: +' + Math.abs(qalan).toFixed(2) + ' AZN')
+      : ('Qalıq: ' + qalan.toFixed(2) + ' AZN');
+
+    document.getElementById('gunlukLimitKart').classList.toggle('over', asilib);
+  }
+
+  function ekraniGuncelle() {
+    if (!veriYuklendi) return;
+    const tarixBugun = tarixBugunmu(goruntulenenTarix);
+    const tarixEtiketiEl = document.getElementById('tarixEtiketi');
+    if (tarixEtiketiEl) {
+      tarixEtiketiEl.innerText = (tarixBugun ? 'Bugün' : (tarixDunenmi(goruntulenenTarix) ? 'Dünən' : '')) + (tarixBugun || tarixDunenmi(goruntulenenTarix) ? ' · ' : '') + tarixFormatla(goruntulenenTarix);
+    }
+    const geriBtn = document.getElementById('tarixGeriBtn');
+    const ireliBtn = document.getElementById('tarixIrəliBtn');
+    if (ireliBtn) ireliBtn.disabled = tarixBugun;
+    const donemBaslikEl = document.getElementById('donemBaslik');
+    if (donemBaslikEl) {
+      donemBaslikEl.innerText = tarixBugun ? 'Bugünkü ümumi xərc' : (tarixDunenmi(goruntulenenTarix) ? 'Dünənki ümumi xərc' : tarixFormatla(goruntulenenTarix) + ' tarixli xərc');
+    }
+    const butonlarKonteynerEl = document.getElementById('butonlarKonteyneri');
+    if (butonlarKonteynerEl) butonlarKonteynerEl.style.display = tarixBugun ? '' : 'none';
+
+    const filtrelenmis = donemeGoreFiltrele();
+    let toplam = 0;
+    const katToplam = {};
+    kategoriler.forEach(k => katToplam[k.ad] = 0);
+    filtrelenmis.forEach(g => {
+      toplam += g.tutar;
+      katToplam[g.kategori] = (katToplam[g.kategori] || 0) + g.tutar;
+    });
+
+    document.getElementById('toplamTutar').innerText = toplam.toFixed(2) + ' AZN';
+    document.getElementById('donemAlt').innerText = filtrelenmis.length + ' əməliyyat';
+
+    const progressEl = document.getElementById('progressCubuk');
+    const breakdownEl = document.getElementById('breakdown');
+    progressEl.innerHTML = '';
+    breakdownEl.innerHTML = '';
+
+    let topKategoriAd = null, topKategoriTutar = 0;
+    if (toplam > 0) {
+      kategoriler.forEach(kat => {
+        const tutar = katToplam[kat.ad] || 0;
+        if (tutar > 0) {
+          const yuzde = (tutar / toplam) * 100;
+          const parca = document.createElement('div');
+          parca.style.background = kat.renk; parca.style.height = '100%'; parca.style.width = yuzde + '%';
+          progressEl.appendChild(parca);
+          const row = document.createElement('div');
+          row.className = 'breakdown-row';
+          row.innerHTML = `<span><span class="dot" style="background:${kat.renk}"></span>${kat.ikon} ${kat.ad}</span><span>${tutar.toFixed(2)} AZN · %${yuzde.toFixed(0)}</span>`;
+          breakdownEl.appendChild(row);
+          if (tutar > topKategoriTutar) { topKategoriTutar = tutar; topKategoriAd = kat.ad; }
+        }
+      });
+    } else {
+      progressEl.innerHTML = '<div style="width:100%; background:rgba(255,255,255,0.12); height:100%;"></div>';
+      breakdownEl.innerHTML = '<div class="breakdown-empty">Bu dövrdə xərc yoxdur.</div>';
+    }
+
+    document.getElementById('insightOrtalama').innerText = (toplam / gunSayisi()).toFixed(2) + ' AZN';
+    document.getElementById('insightTopKategori').innerText = topKategoriAd ? topKategoriAd : '—';
+
+    const bugunkuToplam = giderler
+      .filter(g => !g.aylikRef && new Date(g.tamTarix).toDateString() === goruntulenenTarix.toDateString())
+      .reduce((acc, g) => acc + g.tutar, 0);
+    gunlukLimitGuncelle(bugunkuToplam);
+
+    const hesapDeger = typeof anaHesap === 'number' ? anaHesap : 0;
+    const menuHesapEl = document.getElementById('menuAnaHesapDeger');
+    if (menuHesapEl) {
+      menuHesapEl.innerText = hesapDeger.toFixed(2) + ' AZN';
+      menuHesapEl.classList.toggle('low', hesapDeger < 0);
+    }
+
+    const butonlarEl = document.getElementById('butonlarKonteyneri');
+    butonlarEl.innerHTML = '';
+    kategoriler.forEach((kat, index) => {
+      const btn = document.createElement('button');
+      btn.className = 'cat-btn';
+      btn.style.background = kat.renk;
+      const altYazi = kat.sabitTutar !== null ? kat.sabitTutar.toFixed(2) + ' AZN' : 'Tutar soruşulur';
+      btn.innerHTML = `<span class="name">${kat.ikon} ${kat.ad}</span><span class="sub">${altYazi}</span>`;
+      btn.onclick = () => kategoriyeTikla(index);
+      butonlarEl.appendChild(btn);
+    });
+
+    // Geriyə tarixli düzəlişlər/əlavələr sonra da xronoloji sıralı görünsün deyə,
+    // hər ekran yeniləməsində əməliyyatları tarixə görə (yenidən köhnəyə) sırala.
+    giderler.sort((a, b) => new Date(b.tamTarix) - new Date(a.tamTarix));
+
+    const gosterilecekGiderSayisi = giderler.filter(g => !g.aylikRef).length;
+    let listeHtml = '';
+    if (gosterilecekGiderSayisi === 0) {
+      listeHtml = '<p class="empty-note">Hələ heç bir xərc əlavə olunmayıb.</p>';
+    } else {
+      giderler.forEach((g, index) => {
+        if (g.aylikRef) return; // aylıq xərclər / kredit borcu ödəmələri yalnız kredit kartına yansır
+        listeHtml += `<li class="list-item"><div><span class="cat">${g.kategori}${g.sebeb ? ' — ' + g.sebeb : ''}</span><span class="time">${g.tarix}</span></div>
+          <div class="right"><span class="amt">${g.tutar.toFixed(2)} AZN</span><button onclick="islemFormModalAc(${index})" title="Düzəlt" style="color:var(--navy-soft);">✏️</button><button onclick="giderSilOnayla(${index})" title="Sil">✕</button></div></li>`;
+      });
+    }
+    const listeEl = document.getElementById('giderListesi');
+    if (listeEl) listeEl.innerHTML = listeHtml;
+    const sonEmeliyyatlarEl = document.getElementById('sonEmeliyyatlarListesi');
+    if (sonEmeliyyatlarEl) sonEmeliyyatlarEl.innerHTML = listeHtml;
+
+    veriKaydet();
+  }
+
+  function kategoriSebebSorulsun(kat) {
+    return !!(kat && kat.sebebSoruş);
+  }
+
+  function kategoriyeTikla(index) {
+    const kat = kategoriler[index];
+    if (kat.sabitTutar !== null && !kategoriSebebSorulsun(kat)) {
+      giderEkle(kat.ad, kat.sabitTutar);
+    } else {
+      amountModalAc(index);
+    }
+  }
+
+  function giderEkle(kategori, tutar, sebeb) {
+    const simdi = new Date();
+    const kayit = {
+      kategori, tutar,
+      tamTarix: simdi.toISOString(),
+      tarix: simdi.toLocaleTimeString('az-AZ', { hour: '2-digit', minute: '2-digit' }) + ' · ' + simdi.toLocaleDateString('az-AZ')
+    };
+    if (sebeb) kayit.sebeb = sebeb;
+    giderler.unshift(kayit);
+    if (typeof anaHesap === 'number') anaHesap -= tutar;
+    ekraniGuncelle();
+  }
+
+  // ---- Xərci düzəlt / köhnə tarixli xərc əlavə et ----
+  // Yalnız adi (manual) xərclər üçündür — kredit taksiti / transfer kimi avtomatik
+  // qeydlərin tarixi bu formadan dəyişdirilmir.
+  let islemFormIndex = null; // null = yeni (köhnə tarixli) əlavə, ədəd = mövcud qeydin index-i
+
+  function islemKategoriSecenekleriDoldur(seciliAd) {
+    const sel = document.getElementById('islemFormKategori');
+    sel.innerHTML = kategoriler.map(k =>
+      `<option value="${k.ad}" ${k.ad === seciliAd ? 'selected' : ''}>${k.ikon} ${k.ad}</option>`
+    ).join('');
+    if (seciliAd && !kategoriler.some(k => k.ad === seciliAd)) {
+      sel.innerHTML += `<option value="${seciliAd}" selected>💰 ${seciliAd} (silinib)</option>`;
+    }
+  }
+
+  // Seçilən tarixi (YYYY-MM-DD) saat.dəqiqə.saniyə-ni orijinal (və ya indiki) andan alaraq birləşdirir.
+  function tamTarixQur(tarixStr, saatMenbeIso) {
+    const [yy, mm, dd] = tarixStr.split('-').map(Number);
+    const saatMenbe = saatMenbeIso ? new Date(saatMenbeIso) : new Date();
+    return new Date(yy, mm - 1, dd, saatMenbe.getHours(), saatMenbe.getMinutes(), saatMenbe.getSeconds());
+  }
+
+  function islemFormModalAc(index) {
+    islemFormIndex = (typeof index === 'number') ? index : null;
+    const duzeltMi = islemFormIndex !== null;
+    const g = duzeltMi ? giderler[islemFormIndex] : null;
+
+    document.getElementById('islemFormBaslik').innerText = duzeltMi ? 'Xərci düzəlt' : 'Köhnə tarixli xərc əlavə et';
+    islemKategoriSecenekleriDoldur(duzeltMi ? g.kategori : (kategoriler[0] ? kategoriler[0].ad : ''));
+    document.getElementById('islemFormTutar').value = duzeltMi ? g.tutar : '';
+    document.getElementById('islemFormSebeb').value = duzeltMi ? (g.sebeb || '') : '';
+
+    const tarixInput = document.getElementById('islemFormTarix');
+    const bugunStr = new Date().toISOString().slice(0, 10);
+    tarixInput.max = bugunStr;
+    tarixInput.value = duzeltMi ? new Date(g.tamTarix).toISOString().slice(0, 10) : bugunStr;
+
+    document.getElementById('islemFormError').innerText = '';
+    document.getElementById('islemFormSilBtn').style.display = duzeltMi ? 'inline-block' : 'none';
+    modalAc('islemFormModal');
+  }
+
+  function islemFormOnayla() {
+    const errEl = document.getElementById('islemFormError');
+    const kategori = document.getElementById('islemFormKategori').value;
+    const tutarVal = document.getElementById('islemFormTutar').value;
+    const tutar = parseFloat((tutarVal || '').replace(',', '.'));
+    const sebeb = document.getElementById('islemFormSebeb').value.trim();
+    const tarixVal = document.getElementById('islemFormTarix').value;
+    const bugunStr = new Date().toISOString().slice(0, 10);
+
+    if (!kategori) { errEl.innerText = 'Kateqoriya seç.'; return; }
+    if (isNaN(tutar) || tutar <= 0) { errEl.innerText = 'Düzgün bir məbləğ yaz.'; return; }
+    if (!tarixVal) { errEl.innerText = 'Tarix seç.'; return; }
+    if (tarixVal > bugunStr) { errEl.innerText = 'Gələcək tarix seçilə bilməz.'; return; }
+
+    if (islemFormIndex !== null) {
+      const g = giderler[islemFormIndex];
+      if (typeof anaHesap === 'number') anaHesap += g.tutar; // köhnə məbləği geri qaytar
+      const dt = tamTarixQur(tarixVal, g.tamTarix);
+      g.kategori = kategori;
+      g.tutar = tutar;
+      if (sebeb) g.sebeb = sebeb; else delete g.sebeb;
+      g.tamTarix = dt.toISOString();
+      g.tarix = dt.toLocaleTimeString('az-AZ', { hour: '2-digit', minute: '2-digit' }) + ' · ' + dt.toLocaleDateString('az-AZ');
+      if (typeof anaHesap === 'number') anaHesap -= tutar;
+    } else {
+      const dt = tamTarixQur(tarixVal, null);
+      const kayit = {
+        kategori, tutar, tamTarix: dt.toISOString(),
+        tarix: dt.toLocaleTimeString('az-AZ', { hour: '2-digit', minute: '2-digit' }) + ' · ' + dt.toLocaleDateString('az-AZ')
+      };
+      if (sebeb) kayit.sebeb = sebeb;
+      giderler.unshift(kayit);
+      if (typeof anaHesap === 'number') anaHesap -= tutar;
+    }
+    modalKapat('islemFormModal');
+    ekraniGuncelle();
+  }
+
+  function islemFormSilOnayla() {
+    if (islemFormIndex === null) return;
+    const index = islemFormIndex;
+    modalKapat('islemFormModal');
+    giderSilOnayla(index);
+  }
+
+  // ---- Amount modal ----
+  let amountModalKategoriIndex = null;
+  function amountModalAc(index) {
+    amountModalKategoriIndex = index;
+    const sebebSorulsun = kategoriSebebSorulsun(kategoriler[index]);
+    document.getElementById('amountModalTitle').innerText = kategoriler[index].ad + ' üçün tutar';
+    document.getElementById('amountInput').value = kategoriler[index].sabitTutar !== null ? kategoriler[index].sabitTutar : '';
+    document.getElementById('amountError').innerText = '';
+    const reasonWrap = document.getElementById('amountReasonWrap');
+    const reasonInput = document.getElementById('amountReasonInput');
+    reasonWrap.style.display = sebebSorulsun ? 'block' : 'none';
+    reasonInput.value = '';
+    modalAc('amountModal');
+    setTimeout(() => document.getElementById('amountInput').focus(), 50);
+  }
+  function amountModalOnayla() {
+    const kat = kategoriler[amountModalKategoriIndex];
+    const sebebSorulsun = kategoriSebebSorulsun(kat);
+    const val = document.getElementById('amountInput').value;
+    const tutar = parseFloat((val || '').replace(',', '.'));
+    if (isNaN(tutar) || tutar <= 0) {
+      document.getElementById('amountError').innerText = 'Zəhmət olmasa düzgün bir məbləğ daxil et.';
+      return;
+    }
+    let sebeb = '';
+    if (sebebSorulsun) {
+      sebeb = document.getElementById('amountReasonInput').value.trim();
+      if (!sebeb) {
+        document.getElementById('amountError').innerText = 'Zəhmət olmasa səbəbini yaz.';
+        return;
+      }
+    }
+    giderEkle(kat.ad, tutar, sebeb);
+    modalKapat('amountModal');
+  }
+
+  // ---- Credit card modal (limit + faktiki qalıq) ----
+  function balanceModalAc() {
+    document.getElementById('cardLimitInput').value = typeof kreditLimit === 'number' ? kreditLimit : '';
+    document.getElementById('cardBalanceInput').value = typeof anaHesap === 'number' ? anaHesap : '';
+    document.getElementById('balanceError').innerText = '';
+    modalAc('balanceModal');
+    setTimeout(() => document.getElementById('cardLimitInput').focus(), 50);
+  }
+  function balanceModalOnayla() {
+    const limitVal = document.getElementById('cardLimitInput').value;
+    const balansVal = document.getElementById('cardBalanceInput').value;
+    const limit = parseFloat((limitVal || '').replace(',', '.'));
+    const balans = parseFloat((balansVal || '').replace(',', '.'));
+    if (limitVal.trim() !== '' && (isNaN(limit) || limit < 0)) {
+      document.getElementById('balanceError').innerText = 'Limit düzgün bir rəqəm olmalıdır.';
+      return;
+    }
+    if (isNaN(balans)) {
+      document.getElementById('balanceError').innerText = 'Faktiki qalıq düzgün bir rəqəm olmalıdır.';
+      return;
+    }
+    kreditLimit = limitVal.trim() !== '' ? limit : null;
+    anaHesap = balans;
+    modalKapat('balanceModal');
+    ekraniGuncelle();
+  }
+
+  // ---- New category modal ----
+  function yeniKategoriModalAc() {
+    document.getElementById('newCatName').value = '';
+    document.getElementById('newCatFixed').value = '';
+    document.getElementById('newCatError').innerText = '';
+    modalAc('newCatModal');
+  }
+  function yeniKategoriOnayla() {
+    const ad = document.getElementById('newCatName').value.trim();
+    if (!ad) {
+      document.getElementById('newCatError').innerText = 'Kateqoriya adı boş ola bilməz.';
+      return;
+    }
+    const fixedVal = document.getElementById('newCatFixed').value;
+    let sabitTutar = null;
+    if (fixedVal.trim() !== '') {
+      const p = parseFloat(fixedVal.replace(',', '.'));
+      if (!isNaN(p) && p > 0) sabitTutar = p;
+    }
+    kategoriler.push({ ad, sabitTutar, renk: renkPaleti[kategoriler.length % renkPaleti.length], ikon: '💰' });
+    modalKapat('newCatModal');
+    ekraniGuncelle();
+    if (document.getElementById('yonetimModal').classList.contains('active')) modalListesiniDoldur();
+  }
+
+  // ---- Confirm modal ----
+  function confirmAc(title, text, onConfirm) {
+    document.getElementById('confirmTitle').innerText = title;
+    document.getElementById('confirmText').innerText = text;
+    const btn = document.getElementById('confirmActionBtn');
+    const yeniBtn = btn.cloneNode(true);
+    btn.parentNode.replaceChild(yeniBtn, btn);
+    yeniBtn.addEventListener('click', () => { onConfirm(); modalKapat('confirmModal'); });
+    modalAc('confirmModal');
+  }
+  function giderSilOnayla(index) {
+    confirmAc('Xərci sil', 'Bu qeydi silmək istədiyinə əminsən?', () => {
+      const g = giderler[index];
+      if (typeof anaHesap === 'number' && g && typeof g.tutar === 'number') anaHesap += g.tutar;
+      giderler.splice(index, 1);
+      ekraniGuncelle();
+    });
+  }
+  function listeyiTemizleOnayla() {
+    confirmAc('Hamısını sil', 'Bütün xərc tarixçəsini silmək istədiyinə əminsən? Bu geri alınmır.', () => {
+      if (typeof anaHesap === 'number') {
+        const geriQaytar = giderler.filter(g => !g.aylikRef).reduce((acc, g) => acc + (typeof g.tutar === 'number' ? g.tutar : 0), 0);
+        anaHesap += geriQaytar;
+      }
+      giderler = giderler.filter(g => !!g.aylikRef);
+      ekraniGuncelle();
+    });
+  }
+  function kategoriSilOnayla(index) {
+    if (kategoriler.length <= 1) { confirmAc('Mümkün deyil', 'Ən azı bir kateqoriya qalmalıdır.', () => {}); return; }
+    confirmAc('Kateqoriyanı sil', kategoriler[index].ad + ' kateqoriyasını silmək istədiyinə əminsən?', () => {
+      kategoriler.splice(index, 1); modalListesiniDoldur(); ekraniGuncelle();
+    });
+  }
+
+  // ---- Management modal ----
+  function yonetimPaneliniAc() { modalListesiniDoldur(); modalAc('yonetimModal'); }
+  function yonetimPaneliniKapat() { modalKapat('yonetimModal'); menuAktifItemGuncelle('ana'); ekraniGuncelle(); }
+
+  function modalListesiniDoldur() {
+    const konteyner = document.getElementById('kategoriDuzenlemeListesi');
+    konteyner.innerHTML = '';
+    kategoriler.forEach((kat, index) => {
+      const item = document.createElement('div');
+      item.className = 'modal-item';
+      const renkler = renkPaleti.map(r =>
+        `<span class="swatch ${kat.renk === r ? 'selected' : ''}" style="background:${r}" onclick="kategoriRenkGuncelle(${index}, '${r}')"></span>`
+      ).join('');
+      item.innerHTML = `
+        <div class="field-row">
+          <input type="text" value="${kat.ikon}" onchange="kategoriIkonGuncelle(${index}, this.value)" style="width:52px; text-align:center;">
+          <input type="text" value="${kat.ad}" onchange="kategoriAdGuncelle(${index}, this.value)" style="flex:1;">
+          <button onclick="kategoriSilOnayla(${index})" style="background:none; border:none; cursor:pointer; font-size:14px;">🗑</button>
+        </div>
+        <div class="field-row between" style="font-size:12px; color:var(--muted); border-top:1px solid var(--line); padding-top:8px;">
+          <div class="field-row" style="gap:6px;">
+            <span>Sabit tutar:</span>
+            <input type="number" step="0.01" value="${kat.sabitTutar !== null ? kat.sabitTutar : ''}" placeholder="Soruş" onchange="kategoriSabitTutarGuncelle(${index}, this.value)" style="width:78px;">
+          </div>
+          <div class="field-row" style="gap:4px;">${renkler}</div>
+        </div>
+        <label class="field-row" style="gap:6px; font-size:12px; color:var(--muted); padding-top:2px; cursor:pointer;">
+          <input type="checkbox" ${kat.sebebSoruş ? 'checked' : ''} onchange="kategoriSebebToggle(${index}, this.checked)" style="width:auto;">
+          <span>Əlavə edərkən səbəb də soruşulsun</span>
+        </label>
+      `;
+      konteyner.appendChild(item);
+    });
+  }
+
+  window.kategoriAdGuncelle = (i, val) => { if (val.trim()) { kategoriler[i].ad = val.trim(); } };
+  window.kategoriIkonGuncelle = (i, val) => { if (val.trim()) kategoriler[i].ikon = val.trim(); };
+  window.kategoriSabitTutarGuncelle = (i, val) => {
+    if (val.trim() === '') kategoriler[i].sabitTutar = null;
+    else { const p = parseFloat(val.replace(',', '.')); kategoriler[i].sabitTutar = (!isNaN(p) && p >= 0) ? p : null; }
+  };
+  window.kategoriRenkGuncelle = (i, renk) => { kategoriler[i].renk = renk; modalListesiniDoldur(); };
+  window.kategoriSebebToggle = (i, checked) => { kategoriler[i].sebebSoruş = checked; };
+
+  // ---- Monthly (utility/recurring) expenses ----
+  function cariAyKodu() {
+    const s = new Date();
+    return s.getFullYear() + '-' + (s.getMonth() + 1);
+  }
+
+  // ---- Dedicated installment loan (Kredit Borcu) — configured from the Hesablar və Borclar page ----
+  function tarixFormat(iso) {
+    const [y, m, d] = iso.split('-');
+    return d + '.' + m + '.' + y;
+  }
+
+  // Bir tarixə (iso) ay əlavə edib yeni iso tarix qaytarır
+  function tarixAyEkle(iso, ayFarki) {
+    const [y, m, d] = iso.split('-').map(Number);
+    const dt = new Date(Date.UTC(y, (m - 1) + ayFarki, d));
+    const yyyy = dt.getUTCFullYear();
+    const mm = String(dt.getUTCMonth() + 1).padStart(2, '0');
+    const dd = String(dt.getUTCDate()).padStart(2, '0');
+    return `${yyyy}-${mm}-${dd}`;
+  }
+
+  // Kredit borcunu (aylıq məbləğ / taksit sayı / başlanğıc tarixi) istifadəçinin özünün düzəltməsi
+  function krediBorcuDuzeltModalAc() {
+    const k = krediBorcu || {};
+    document.getElementById('krediBorcuDuzeltMebleg').value = (typeof k.aylikMebleg === 'number') ? k.aylikMebleg : '';
+    document.getElementById('krediBorcuDuzeltSayi').value = (typeof k.taksitSayi === 'number' && k.taksitSayi > 0) ? k.taksitSayi : '';
+    document.getElementById('krediBorcuDuzeltBaslangic').value = k.baslangic || '';
+    document.getElementById('krediBorcuDuzeltError').innerText = '';
+    modalAc('krediBorcuDuzeltModal');
+  }
+
+  function krediBorcuDuzeltOnayla() {
+    const meblegVal = document.getElementById('krediBorcuDuzeltMebleg').value;
+    const sayiVal = document.getElementById('krediBorcuDuzeltSayi').value;
+    const baslangicVal = document.getElementById('krediBorcuDuzeltBaslangic').value;
+    const errEl = document.getElementById('krediBorcuDuzeltError');
+
+    const mebleg = parseFloat((meblegVal || '').replace(',', '.'));
+    const sayi = parseInt(sayiVal, 10);
+
+    if (isNaN(mebleg) || mebleg <= 0) {
+      errEl.innerText = 'Aylıq taksit məbləğini düzgün yaz.';
+      return;
+    }
+    if (isNaN(sayi) || sayi <= 0) {
+      errEl.innerText = 'Taksit sayısını düzgün yaz.';
+      return;
+    }
+    if (!baslangicVal) {
+      errEl.innerText = 'Başlanğıc tarixini seç.';
+      return;
+    }
+
+    if (!krediBorcu) {
+      krediBorcu = {
+        id: 'kredi_borcu_' + idUret(), ad: 'Kredi Borcu',
+        odenmisTaksitSayi: 0, sonOdenenAy: null, odenenMebleg: null
+      };
+    }
+    krediBorcu.aylikMebleg = mebleg;
+    krediBorcu.taksitSayi = sayi;
+    krediBorcu.baslangic = baslangicVal;
+    krediBorcu.bitis = tarixAyEkle(baslangicVal, sayi - 1);
+    if (krediBorcu.odenmisTaksitSayi > sayi) krediBorcu.odenmisTaksitSayi = sayi;
+
+    veriKaydet();
+    modalKapat('krediBorcuDuzeltModal');
+    krediBorcuGoster();
+    ekraniGuncelle();
+  }
+
+  // Combined debt chart for the Güncel Borclar panel: Kredi kartı borcu + Deposit Borcu + Kredit borcu
+  function guncelBorclarQrafikGoster() {
+    const kkBorcu = (typeof anaHesap === 'number' && anaHesap < 0) ? Math.abs(anaHesap) : 0;
+    const depozitBorcu = (typeof depozitBakiye === 'number' && depozitBakiye < 0) ? Math.abs(depozitBakiye) : 0;
+    const krediBorcuQalan = krediBorcu ? (krediBorcu.taksitSayi - krediBorcu.odenmisTaksitSayi) * krediBorcu.aylikMebleg : 0;
+    const cemi = kkBorcu + depozitBorcu + krediBorcuQalan;
+
+    document.getElementById('guncelBorcCemi').innerText = (cemi > 0 ? '-' : '') + cemi.toFixed(2) + ' AZN';
+
+    const qrafikEl = document.getElementById('guncelBorcQrafik');
+    const breakdownEl = document.getElementById('guncelBorcBreakdown');
+    qrafikEl.innerHTML = '';
+    breakdownEl.innerHTML = '';
+
+    const parcalar = [
+      { ad: 'Kredit kartı borcu', tutar: kkBorcu, renk: '#c99a3a' },
+      { ad: 'Deposit Borcu', tutar: depozitBorcu, renk: '#b5533f' },
+      { ad: 'Kredit borcu', tutar: krediBorcuQalan, renk: '#4a6fa5' }
+    ];
+
+    if (cemi > 0) {
+      parcalar.forEach(p => {
+        if (p.tutar > 0) {
+          const yuzde = (p.tutar / cemi) * 100;
+          const parca = document.createElement('div');
+          parca.style.background = p.renk; parca.style.height = '100%'; parca.style.width = yuzde + '%';
+          qrafikEl.appendChild(parca);
+          const row = document.createElement('div');
+          row.className = 'debt-breakdown-row';
+          row.innerHTML = `<span><span class="dot" style="background:${p.renk}"></span>${p.ad}</span><span>-${p.tutar.toFixed(2)} AZN · %${yuzde.toFixed(0)}</span>`;
+          breakdownEl.appendChild(row);
+        }
+      });
+    } else {
+      qrafikEl.innerHTML = '<div style="width:100%; background:rgba(255,255,255,0.12); height:100%;"></div>';
+      breakdownEl.innerHTML = '<div class="breakdown-empty" style="color:#9aa6c2;">Borc yoxdur.</div>';
+    }
+  }
+
+  // Bir taksitin tarixini hesabla: başlanğıc + i ay
+  function taksitTarixi(baslangicIso, i) {
+    const [y, m, d] = baslangicIso.split('-').map(Number);
+    const dt = new Date(Date.UTC(y, (m - 1) + i, d));
+    const dd = String(dt.getUTCDate()).padStart(2, '0');
+    const mm = String(dt.getUTCMonth() + 1).padStart(2, '0');
+    return dd + '.' + mm;
+  }
+
+  // Kredit borcunun aylıq ödəniş qrafiki (sütun qrafik)
+  function krediBorcuAylikQrafikGoster() {
+    const chartEl = document.getElementById('krediBorcuAylikQrafik');
+    if (!chartEl || !krediBorcu) return;
+    chartEl.innerHTML = '';
+    for (let i = 0; i < krediBorcu.taksitSayi; i++) {
+      const odenilib = i < krediBorcu.odenmisTaksitSayi;
+      const col = document.createElement('div');
+      col.className = 'taksit-bar-col';
+      col.innerHTML = `
+        <span class="taksit-bar-amt${odenilib ? ' paid' : ''}">${odenilib ? '✓' : krediBorcu.aylikMebleg.toFixed(0)}</span>
+        <div class="taksit-bar${odenilib ? ' filled' : ''}"></div>
+        <span class="taksit-bar-month">${taksitTarixi(krediBorcu.baslangic, i)}</span>
+      `;
+      chartEl.appendChild(col);
+    }
+  }
+
+  function krediBorcuGoster() {
+    guncelBorclarQrafikGoster();
+    if (!krediBorcu) {
+      document.getElementById('krediBorcuMebleg').innerText = '0.00 AZN';
+      document.getElementById('krediBorcuTarixler').innerText = '—';
+      document.getElementById('krediBorcuIrəliləyiş').innerText = '0/0 taksit ödənilib';
+      document.getElementById('krediBorcuQalan').innerText = 'Qalıq: 0.00 AZN';
+      document.getElementById('krediBorcuError').innerText = '';
+      document.getElementById('krediBorcuAylikQrafik').innerHTML = '';
+      const bosBtn = document.getElementById('krediBorcuOdeBtn');
+      bosBtn.innerText = 'Bu ayın taksitini ödə (kredit kartından)';
+      bosBtn.disabled = true;
+      return;
+    }
+    document.getElementById('krediBorcuMebleg').innerText = krediBorcu.aylikMebleg.toFixed(2) + ' AZN';
+    document.getElementById('krediBorcuTarixler').innerText = tarixFormat(krediBorcu.baslangic) + ' – ' + tarixFormat(krediBorcu.bitis);
+    document.getElementById('krediBorcuIrəliləyiş').innerText = krediBorcu.odenmisTaksitSayi + '/' + krediBorcu.taksitSayi + ' taksit ödənilib';
+    const qalan = (krediBorcu.taksitSayi - krediBorcu.odenmisTaksitSayi) * krediBorcu.aylikMebleg;
+    document.getElementById('krediBorcuQalan').innerText = 'Qalıq: ' + (qalan > 0 ? '-' : '') + qalan.toFixed(2) + ' AZN';
+    document.getElementById('krediBorcuError').innerText = '';
+
+    krediBorcuAylikQrafikGoster();
+
+    const buAy = cariAyKodu();
+    const odenib = krediBorcu.sonOdenenAy === buAy;
+    const bitib = krediBorcu.odenmisTaksitSayi >= krediBorcu.taksitSayi;
+    const btn = document.getElementById('krediBorcuOdeBtn');
+    if (bitib) {
+      btn.innerText = '🎉 Kredit bağlanıb';
+      btn.disabled = true;
+    } else if (odenib) {
+      btn.innerText = '✓ Bu ayın taksiti ödənilib (ləğv et)';
+      btn.disabled = false;
+    } else {
+      btn.innerText = 'Bu ayın taksitini ödə (kredit kartından)';
+      btn.disabled = false;
+    }
+  }
+
+  function krediBorcuOde() {
+    if (!krediBorcu) return;
+    const buAy = cariAyKodu();
+    const odenib = krediBorcu.sonOdenenAy === buAy;
+    if (!odenib) {
+      if (krediBorcu.odenmisTaksitSayi >= krediBorcu.taksitSayi) {
+        document.getElementById('krediBorcuError').innerText = 'Bütün taksitlər artıq ödənilib.';
+        return;
+      }
+      giderEkleSessiz(krediBorcu.ad, krediBorcu.aylikMebleg, krediBorcu.id);
+      krediBorcu.sonOdenenAy = buAy;
+      krediBorcu.odenenMebleg = krediBorcu.aylikMebleg;
+      krediBorcu.odenmisTaksitSayi += 1;
+    } else {
+      const gIndex = giderler.findIndex(g => g.aylikRef === krediBorcu.id && g.ayKodu === buAy);
+      if (gIndex !== -1) giderler.splice(gIndex, 1);
+      if (typeof anaHesap === 'number' && typeof krediBorcu.odenenMebleg === 'number') {
+        anaHesap += krediBorcu.odenenMebleg;
+      }
+      if (krediBorcu.odenmisTaksitSayi > 0) krediBorcu.odenmisTaksitSayi -= 1;
+      krediBorcu.sonOdenenAy = null;
+      krediBorcu.odenenMebleg = null;
+    }
+    krediBorcuGoster();
+    ekraniGuncelle();
+  }
+
+  // Same as giderEkle, but used from the kredit borcu (installment) flow so we don't
+  // re-render the main screen twice; ekraniGuncelle() is called separately right after.
+  function giderEkleSessiz(kategori, tutar, aylikRef) {
+    const simdi = new Date();
+    const kayit = {
+      kategori, tutar,
+      tamTarix: simdi.toISOString(),
+      tarix: simdi.toLocaleTimeString('az-AZ', { hour: '2-digit', minute: '2-digit' }) + ' · ' + simdi.toLocaleDateString('az-AZ')
+    };
+    if (aylikRef) { kayit.aylikRef = aylikRef; kayit.ayKodu = cariAyKodu(); }
+    giderler.unshift(kayit);
+    if (typeof anaHesap === 'number') anaHesap -= tutar;
+  }
+
+  function modalAc(id) { document.getElementById(id).classList.add('active'); }
+  function modalKapat(id) { document.getElementById(id).classList.remove('active'); }
+
+  // ---- Side menu ----
+  function menuAc() {
+    document.getElementById('sideMenu').classList.add('active');
+    document.getElementById('sideMenuOverlay').classList.add('active');
+  }
+  function menuKapat() {
+    document.getElementById('sideMenu').classList.remove('active');
+    document.getElementById('sideMenuOverlay').classList.remove('active');
+  }
+  function menuAktifItemGuncelle(secilen) {
+    document.getElementById('menuAnaSehife').classList.toggle('active', secilen === 'ana');
+    document.getElementById('menuHesablar').classList.toggle('active', secilen === 'hesablar');
+    document.getElementById('menuAylikHesabat').classList.toggle('active', secilen === 'aylikHesabat');
+    document.getElementById('menuAyarlar').classList.toggle('active', secilen === 'ayarlar');
+  }
+  function menuAnaSehifeSec() {
+    menuAktifItemGuncelle('ana');
+    menuKapat();
+  }
+  function menuHesablarSec() {
+    menuAktifItemGuncelle('hesablar');
+    menuKapat();
+    hesablarPaneliniAc();
+  }
+  function menuAylikHesabatSec() {
+    menuAktifItemGuncelle('aylikHesabat');
+    menuKapat();
+    aylikHesabatPaneliniAc();
+  }
+  function menuAyarlarSec() {
+    menuAktifItemGuncelle('ayarlar');
+    menuKapat();
+    ayarlarPaneliniAc();
+  }
+
+  // ==== Ayarlar: Günlük limit + Kateqoriyalar + Son əməliyyatlar + İşıq rejimi ====
+  function ayarlarPaneliniAc() {
+    document.getElementById('gunlukLimitInput').value = (typeof gunlukLimit === 'number') ? gunlukLimit : '';
+    document.getElementById('gunlukLimitError').innerText = '';
+    kilidAyarGoster();
+    modalAc('ayarlarModal');
+  }
+  function ayarlarPaneliniKapat() {
+    modalKapat('ayarlarModal');
+    menuAktifItemGuncelle('ana');
+    ekraniGuncelle();
+  }
+  function gunlukLimitYadSaxla() {
+    const val = document.getElementById('gunlukLimitInput').value;
+    const limit = parseFloat((val || '').replace(',', '.'));
+    if (isNaN(limit) || limit < 0) {
+      document.getElementById('gunlukLimitError').innerText = 'Düzgün bir məbləğ yaz.';
+      return;
+    }
+    gunlukLimit = limit;
+    veriKaydet();
+    ekraniGuncelle();
+    document.getElementById('gunlukLimitError').innerText = '';
+  }
+  function ayarlarKateqoriyalarAc() {
+    modalKapat('ayarlarModal');
+    yonetimPaneliniAc();
+  }
+  function ayarlarSonEmeliyyatlarAc() {
+    modalKapat('ayarlarModal');
+    sonEmeliyyatlarPaneliniAc();
+  }
+
+  // ==== Aylıq xülasə: "Bu ay hara pul gedir?" ====
+  function aylikHesabatVerisi() {
+    const indi = new Date();
+    const buAy = indi.getMonth(), buIl = indi.getFullYear();
+    let kecenAy = buAy - 1, kecenIl = buIl;
+    if (kecenAy < 0) { kecenAy = 11; kecenIl -= 1; }
+    const buAyToplam = {}, kecenAyToplam = {};
+    let buAyCemi = 0;
+    giderler.forEach(g => {
+      if (g.aylikRef) return;
+      const t = new Date(g.tamTarix);
+      if (t.getFullYear() === buIl && t.getMonth() === buAy) {
+        buAyToplam[g.kategori] = (buAyToplam[g.kategori] || 0) + g.tutar;
+        buAyCemi += g.tutar;
+      } else if (t.getFullYear() === kecenIl && t.getMonth() === kecenAy) {
+        kecenAyToplam[g.kategori] = (kecenAyToplam[g.kategori] || 0) + g.tutar;
+      }
+    });
+    return { buAyToplam, kecenAyToplam, buAyCemi };
+  }
+
+  // Kateqoriya dağılımını pasta (doughnut) qrafik kimi göstərir.
+  function aylikPastaChartGoster(siraliKat) {
+    const canvas = document.getElementById('aylikPastaCanvas');
+    const bosMesaj = document.getElementById('aylikPastaBosMesaj');
+    if (!canvas || typeof Chart === 'undefined') return;
+    if (aylikPastaChart) { aylikPastaChart.destroy(); aylikPastaChart = null; }
+    if (!siraliKat.length) {
+      canvas.style.display = 'none';
+      if (bosMesaj) bosMesaj.style.display = 'block';
+      return;
+    }
+    canvas.style.display = 'block';
+    if (bosMesaj) bosMesaj.style.display = 'none';
+    const inkRengi = cssVar('--ink') || '#1c2333';
+    const panelRengi = cssVar('--panel') || '#ffffff';
+    aylikPastaChart = new Chart(canvas.getContext('2d'), {
+      type: 'doughnut',
+      data: {
+        labels: siraliKat.map(k => k.ikon + ' ' + k.ad),
+        datasets: [{
+          data: siraliKat.map(k => Number(k.tutar.toFixed(2))),
+          backgroundColor: siraliKat.map(k => k.renk),
+          borderColor: panelRengi,
+          borderWidth: 2
+        }]
+      },
+      options: {
+        responsive: true,
+        cutout: '62%',
+        plugins: {
+          legend: { position: 'bottom', labels: { color: inkRengi, boxWidth: 12, padding: 12, font: { size: 11 } } },
+          tooltip: { callbacks: { label: (ctx) => `${ctx.label}: ${ctx.parsed.toFixed(2)} AZN` } }
+        }
+      }
+    });
+  }
+
+  // Bu ayın gün-gün xərc trendini xətt qrafik kimi göstərir.
+  function aylikTrendChartGoster() {
+    const canvas = document.getElementById('aylikTrendCanvas');
+    if (!canvas || typeof Chart === 'undefined') return;
+    if (aylikTrendChart) { aylikTrendChart.destroy(); aylikTrendChart = null; }
+
+    const indi = new Date();
+    const buIl = indi.getFullYear(), buAy = indi.getMonth();
+    const buGunSayi = indi.getDate();
+    const gunlukToplamlar = new Array(buGunSayi).fill(0);
+    giderler.forEach(g => {
+      if (g.aylikRef) return;
+      const t = new Date(g.tamTarix);
+      if (t.getFullYear() === buIl && t.getMonth() === buAy) {
+        const gunIndex = t.getDate() - 1;
+        if (gunIndex >= 0 && gunIndex < buGunSayi) gunlukToplamlar[gunIndex] += g.tutar;
+      }
+    });
+
+    const navyRengi = cssVar('--navy') || '#1f2a44';
+    const inkRengi = cssVar('--ink') || '#1c2333';
+    const muted = cssVar('--muted') || '#6b7688';
+    const lineRengi = cssVar('--line') || '#e3e7ee';
+
+    aylikTrendChart = new Chart(canvas.getContext('2d'), {
+      type: 'line',
+      data: {
+        labels: gunlukToplamlar.map((_, i) => String(i + 1)),
+        datasets: [{
+          label: 'Günlük xərc',
+          data: gunlukToplamlar.map(v => Number(v.toFixed(2))),
+          borderColor: navyRengi,
+          backgroundColor: navyRengi + '33',
+          fill: true,
+          tension: 0.3,
+          pointRadius: 2
+        }]
+      },
+      options: {
+        responsive: true,
+        plugins: {
+          legend: { display: false },
+          tooltip: { callbacks: { label: (ctx) => `${ctx.parsed.y.toFixed(2)} AZN` } }
+        },
+        scales: {
+          x: { ticks: { color: muted, font: { size: 10 } }, grid: { color: lineRengi } },
+          y: { ticks: { color: muted, font: { size: 10 } }, grid: { color: lineRengi }, beginAtZero: true }
+        }
+      }
+    });
+  }
+
+  function aylikHesabatPaneliniAc() { aylikHesabatGoster(); modalAc('aylikHesabatModal'); }
+  function aylikHesabatPaneliniKapat() { modalKapat('aylikHesabatModal'); menuAktifItemGuncelle('ana'); }
+
+  function aylikHesabatGoster() {
+    const { buAyToplam, kecenAyToplam, buAyCemi } = aylikHesabatVerisi();
+    document.getElementById('aylikHesabatCemi').innerText = buAyCemi.toFixed(2) + ' AZN';
+
+    const siraliKat = kategoriler
+      .map(k => ({ ad: k.ad, ikon: k.ikon, renk: k.renk, tutar: buAyToplam[k.ad] || 0 }))
+      .filter(k => k.tutar > 0)
+      .sort((a, b) => b.tutar - a.tutar);
+    const maxTutar = siraliKat.length ? siraliKat[0].tutar : 0;
+
+    aylikPastaChartGoster(siraliKat);
+    aylikTrendChartGoster();
+
+    const listEl = document.getElementById('aylikHesabatListesi');
+    listEl.innerHTML = '';
+    if (siraliKat.length === 0) {
+      listEl.innerHTML = '<div class="breakdown-empty">Bu ay hələ xərc yoxdur.</div>';
+    } else {
+      siraliKat.forEach(k => {
+        const barYuzde = maxTutar > 0 ? (k.tutar / maxTutar) * 100 : 0;
+        const cemYuzde = buAyCemi > 0 ? (k.tutar / buAyCemi) * 100 : 0;
+        const row = document.createElement('div');
+        row.className = 'hesabat-row';
+        row.innerHTML = `<div class="hesabat-row-top"><span>${k.ikon} ${k.ad}</span><span>${k.tutar.toFixed(2)} AZN · %${cemYuzde.toFixed(0)}</span></div>
+          <div class="hesabat-bar-bg"><div class="hesabat-bar-fill" style="width:${barYuzde}%; background:${k.renk};"></div></div>`;
+        listEl.appendChild(row);
+      });
+    }
+
+    const trendEl = document.getElementById('aylikHesabatTrend');
+    trendEl.innerHTML = '';
+    if (Object.keys(kecenAyToplam).length === 0) {
+      trendEl.innerHTML = '<div class="breakdown-empty">Müqayisə üçün keçən ay üzrə məlumat yoxdur.</div>';
+    } else {
+      const hamiKatAdlari = new Set([...Object.keys(buAyToplam), ...Object.keys(kecenAyToplam)]);
+      const trendSiyahi = [];
+      hamiKatAdlari.forEach(ad => {
+        const kat = kategoriler.find(k => k.ad === ad);
+        const bu = buAyToplam[ad] || 0;
+        const kecen = kecenAyToplam[ad] || 0;
+        if (bu === 0 && kecen === 0) return;
+        let deyisim, yeni = false, bitib = false;
+        if (kecen === 0) { yeni = true; deyisim = 100; }
+        else if (bu === 0) { bitib = true; deyisim = -100; }
+        else { deyisim = ((bu - kecen) / kecen) * 100; }
+        trendSiyahi.push({ ad, ikon: kat ? kat.ikon : '💰', deyisim, yeni, bitib });
+      });
+      trendSiyahi.sort((a, b) => Math.abs(b.deyisim) - Math.abs(a.deyisim));
+      trendSiyahi.forEach(t => {
+        let etiket, sinif;
+        if (t.yeni) { etiket = 'Yeni'; sinif = 'trend-new'; }
+        else if (t.bitib) { etiket = 'Kəsildi'; sinif = 'trend-down'; }
+        else { etiket = (t.deyisim > 0 ? '↑ ' : '↓ ') + Math.abs(t.deyisim).toFixed(0) + '%'; sinif = t.deyisim > 0 ? 'trend-up' : 'trend-down'; }
+        const div = document.createElement('div');
+        div.className = 'trend-row';
+        div.innerHTML = `<span>${t.ikon} ${t.ad}</span><span class="${sinif}">${etiket}</span>`;
+        trendEl.appendChild(div);
+      });
+    }
+  }
+
+  // ==== Son əməliyyatlar (tam tarixçə) ====
+  function sonEmeliyyatlarPaneliniAc() { ekraniGuncelle(); modalAc('sonEmeliyyatlarModal'); }
+  function sonEmeliyyatlarPaneliniKapat() { modalKapat('sonEmeliyyatlarModal'); menuAktifItemGuncelle('ana'); }
+
+  // ==== Hesablar: Cash / Kredi kartı / Debit bank + transfer ====
+  function hesabAdi(tip) {
+    if (tip === 'nagd') return 'Cash Hesab';
+    if (tip === 'debit') return 'Debit bank Hesabım';
+    if (tip === 'depozit') return 'Bank Deposit Hesabım';
+    if (tip === 'kredit') return 'Kredi kartı Hesabım';
+    return tip;
+  }
+  function hesabIkonu(tip) {
+    if (tip === 'nagd') return '💵';
+    if (tip === 'debit') return '🏦';
+    if (tip === 'depozit') return '🏛️';
+    if (tip === 'kredit') return '💳';
+    return '💰';
+  }
+
+  function hesablarPaneliniAc() {
+    hesablarGoster();
+    krediBorcuGoster();
+    modalAc('hesablarModal');
+  }
+  function hesablarPaneliniKapat() {
+    modalKapat('hesablarModal');
+    menuAktifItemGuncelle('ana');
+    ekraniGuncelle();
+  }
+
+  function hesablarGoster() {
+    const konteyner = document.getElementById('hesablarKartlari');
+    const limit = (typeof kreditLimit === 'number') ? kreditLimit : 0;
+    const borc = (typeof anaHesap === 'number') ? anaHesap : 0;
+    const muvcud = limit + borc; // istifadə edilə bilən limit
+    konteyner.innerHTML = `
+      <div class="modal-item">
+        <div class="field-row between">
+          <div class="field-row"><span style="font-size:18px;">💵</span><b>Cash Hesab</b></div>
+          <button class="btn btn-ghost" onclick="hesabDuzeltModalAc('nagd')" style="padding:5px 10px;">Düzəlt</button>
+        </div>
+        <div style="font-size:19px; font-weight:700; color:var(--navy);">${nagdBakiye.toFixed(2)} AZN</div>
+      </div>
+      <div class="modal-item">
+        <div class="field-row between">
+          <div class="field-row"><span style="font-size:18px;">🏦</span><b>Debit bank Hesabım</b></div>
+          <button class="btn btn-ghost" onclick="hesabDuzeltModalAc('debit')" style="padding:5px 10px;">Düzəlt</button>
+        </div>
+        <div style="font-size:19px; font-weight:700; color:var(--navy);">${debitBakiye.toFixed(2)} AZN</div>
+      </div>
+      <div class="modal-item">
+        <div class="field-row between">
+          <div class="field-row"><span style="font-size:18px;">🏛️</span><b>Bank Deposit Hesabım</b></div>
+          <button class="btn btn-ghost" onclick="hesabDuzeltModalAc('depozit')" style="padding:5px 10px;">Düzəlt</button>
+        </div>
+        <div style="font-size:19px; font-weight:700; color:${depozitBakiye < 0 ? 'var(--danger)' : 'var(--navy)'};">${depozitBakiye.toFixed(2)} AZN</div>
+      </div>
+      <div class="modal-item">
+        <div class="field-row between">
+          <div class="field-row"><span style="font-size:18px;">💳</span><b>Kredi kartı Hesabım</b></div>
+          <button class="btn btn-ghost" onclick="menuKapat(); hesablarPaneliniKapat(); balanceModalAc();" style="padding:5px 10px;">Düzəlt</button>
+        </div>
+        <div style="font-size:19px; font-weight:700; color:${borc < 0 ? 'var(--danger)' : 'var(--navy)'};">${borc.toFixed(2)} AZN</div>
+        <div style="font-size:12px; color:var(--muted);">Limit: ${limit.toFixed(2)} AZN · İstifadə edilə bilən: ${muvcud.toFixed(2)} AZN</div>
+      </div>
+    `;
+    hesabTransferTarixceGoster();
+  }
+
+  function hesabTransferTarixceGoster() {
+    const konteyner = document.getElementById('hesabTransferTarixce');
+    if (hesabTransferleri.length === 0) {
+      konteyner.innerHTML = '<p class="empty-note" style="padding:8px 0;">Hələ transfer edilməyib.</p>';
+      return;
+    }
+    konteyner.innerHTML = '';
+    hesabTransferleri.forEach((t, index) => {
+      const row = document.createElement('div');
+      row.className = 'list-item';
+      row.innerHTML = `
+        <div>
+          <span class="cat">${hesabIkonu(t.menbeTip)} ${hesabAdi(t.menbeTip)} → ${hesabIkonu(t.hedefTip)} ${hesabAdi(t.hedefTip)}</span>
+          <span class="time">${t.tarix}</span>
+        </div>
+        <div class="right">
+          <span class="amt">${t.tutar.toFixed(2)} AZN</span>
+          <button onclick="transferSilOnayla(${index})">✕</button>
+        </div>
+      `;
+      konteyner.appendChild(row);
+    });
+  }
+
+  let hesabDuzeltTipi = null;
+  function hesabDuzeltModalAc(tip) {
+    hesabDuzeltTipi = tip;
+    document.getElementById('hesabDuzeltBaslik').innerText = hesabAdi(tip) + ' balansı';
+    document.getElementById('hesabDuzeltInput').value = hesabBakiyesiOxu(tip);
+    document.getElementById('hesabDuzeltError').innerText = '';
+    modalAc('hesabDuzeltModal');
+  }
+  function hesabDuzeltOnayla() {
+    const val = document.getElementById('hesabDuzeltInput').value;
+    const p = parseFloat(val.replace(',', '.'));
+    if (isNaN(p)) {
+      document.getElementById('hesabDuzeltError').innerText = 'Düzgün rəqəm yaz.';
+      return;
+    }
+    if (hesabDuzeltTipi === 'nagd') nagdBakiye = p;
+    else if (hesabDuzeltTipi === 'debit') debitBakiye = p;
+    else if (hesabDuzeltTipi === 'depozit') depozitBakiye = p;
+    veriKaydet();
+    modalKapat('hesabDuzeltModal');
+    hesablarGoster();
+  }
+
+  function hesabBakiyesiOxu(tip) {
+    if (tip === 'nagd') return nagdBakiye;
+    if (tip === 'debit') return debitBakiye;
+    if (tip === 'depozit') return depozitBakiye;
+    if (tip === 'kredit') return (typeof anaHesap === 'number') ? anaHesap : 0;
+    return 0;
+  }
+  function hesabBakiyesiDeyis(tip, deltaMenbe) {
+    // deltaMenbe: mənfi işarəli dəyişiklik menbə üçün, müsbət hədəf üçün eyni funksiyada tutar veriləcək
+    if (tip === 'nagd') nagdBakiye += deltaMenbe;
+    else if (tip === 'debit') debitBakiye += deltaMenbe;
+    else if (tip === 'depozit') depozitBakiye += deltaMenbe;
+    else if (tip === 'kredit') anaHesap = ((typeof anaHesap === 'number') ? anaHesap : 0) + deltaMenbe;
+  }
+
+  function transferModalAc() {
+    document.getElementById('transferMenbe').value = 'nagd';
+    document.getElementById('transferHedef').value = 'kredit';
+    document.getElementById('transferMebleg').value = '';
+    document.getElementById('transferError').innerText = '';
+    modalAc('transferModal');
+  }
+
+  function transferOnayla() {
+    const menbeTip = document.getElementById('transferMenbe').value;
+    const hedefTip = document.getElementById('transferHedef').value;
+    const errEl = document.getElementById('transferError');
+    const tutarVal = document.getElementById('transferMebleg').value;
+    const tutar = parseFloat((tutarVal || '').replace(',', '.'));
+
+    if (menbeTip === hedefTip) {
+      errEl.innerText = 'Mənbə və hədəf hesab eyni ola bilməz.';
+      return;
+    }
+    if (isNaN(tutar) || tutar <= 0) {
+      errEl.innerText = 'Düzgün məbləğ yaz.';
+      return;
+    }
+    if (menbeTip !== 'kredit') {
+      const mevcud = hesabBakiyesiOxu(menbeTip);
+      if (tutar > mevcud) {
+        errEl.innerText = hesabAdi(menbeTip) + ' hesabında kifayət qədər balans yoxdur.';
+        return;
+      }
+    }
+
+    hesabBakiyesiDeyis(menbeTip, -tutar);
+    hesabBakiyesiDeyis(hedefTip, tutar);
+
+    const simdi = new Date();
+    hesabTransferleri.unshift({
+      menbeTip, hedefTip, tutar,
+      tarix: simdi.toLocaleTimeString('az-AZ', { hour: '2-digit', minute: '2-digit' }) + ' · ' + simdi.toLocaleDateString('az-AZ')
+    });
+
+    veriKaydet();
+    modalKapat('transferModal');
+    hesablarGoster();
+    ekraniGuncelle();
+  }
+
+  function transferSilOnayla(index) {
+    const t = hesabTransferleri[index];
+    confirmAc('Transferi ləğv et', hesabAdi(t.menbeTip) + ' → ' + hesabAdi(t.hedefTip) + ' (' + t.tutar.toFixed(2) + ' AZN) geri qaytarılsın?', () => {
+      hesabBakiyesiDeyis(t.menbeTip, t.tutar);
+      hesabBakiyesiDeyis(t.hedefTip, -t.tutar);
+      hesabTransferleri.splice(index, 1);
+      veriKaydet();
+      hesablarGoster();
+      ekraniGuncelle();
+    });
+  }
+
+  veriYukle();
+  kilidYoxla();
+
+  // ==== PWA: Service Worker qeydiyyatı ====
+  // Yalnız http(s):// üzərində işləyir; file:// ilə açsan səssizcə keçilir.
+  if ('serviceWorker' in navigator && (location.protocol === 'http:' || location.protocol === 'https:')) {
+    window.addEventListener('load', () => {
+      navigator.serviceWorker.register('sw.js').catch((e) => console.warn('SW qeydiyyatı alınmadı:', e));
+    });
+  }
+</script>
+</body>
+</html>
