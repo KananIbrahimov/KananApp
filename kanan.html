@@ -2,7 +2,7 @@
 <html lang="az">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <title>Günlük Gider Takibi</title>
 <!-- ==== PWA: manifest.json, sw.js, icon-192.png, icon-512.png ilə eyni qovluqda olmalıdır ====
      Bunları http(s):// üzərindən açmaq lazımdır (file:// ilə Service Worker işləmir,
@@ -86,6 +86,7 @@
     min-height: 100vh;
     color: var(--ink);
     transition: background .2s, color .2s;
+    touch-action: manipulation; /* iOS-da çift toxunuşla yaxınlaşdırmanı söndürür — native tətbiq hissi */
   }
   .container { width: 100%; max-width: 430px; }
 
@@ -693,6 +694,10 @@
     <button class="btn btn-ghost" id="menuBackupIndir" style="width:100%; justify-content:flex-start; border:1px solid var(--line); margin-bottom:8px;" onclick="backupIndir()">📥 Backup yüklə (JSON)</button>
     <button class="btn btn-ghost" id="menuBackupBerpa" style="width:100%; justify-content:flex-start; border:1px solid var(--line); margin-bottom:14px;" onclick="document.getElementById('backupFileInput').click()">📤 Backup bərpa et</button>
     <input type="file" id="backupFileInput" accept="application/json" style="display:none;" onchange="backupBerpaEt(event)">
+
+    <h3 style="font-size:14px; margin:18px 0 10px; color:var(--ink);">🔄 Tətbiq versiyası</h3>
+    <button class="btn btn-ghost" style="width:100%; justify-content:flex-start; border:1px solid var(--line); margin-bottom:8px;" onclick="tetbiqiYenile()">🔄 Yenilə (son versiyanı yüklə)</button>
+    <p class="hint" style="margin:0 0 14px;">Yeniləmə etsəm belə köhnə görünürsə bunu bas — keşi təmizləyib son versiyanı yenidən yükləyir. Ana ekrandan silib-yenidən əlavə etməyə ehtiyac qalmır.</p>
 
     <div class="modal-footer" style="justify-content:flex-end; margin-top:16px;">
       <button class="btn btn-ghost" onclick="ayarlarPaneliniKapat()">Bağla</button>
@@ -2377,6 +2382,24 @@
   }
 
   // ==== Ayarlar: Günlük limit + Kateqoriyalar + Son əməliyyatlar + İşıq rejimi ====
+  // Keşi (cache) və service worker-i təmizləyib son versiyanı yenidən yükləyir —
+  // istifadəçi hər dəfə ana ekrandan silib-yenidən əlavə etməsin deyə.
+  async function tetbiqiYenile() {
+    try {
+      if ('caches' in window) {
+        const adlar = await caches.keys();
+        await Promise.all(adlar.map((ad) => caches.delete(ad)));
+      }
+      if ('serviceWorker' in navigator) {
+        const qeydler = await navigator.serviceWorker.getRegistrations();
+        await Promise.all(qeydler.map((r) => r.unregister()));
+      }
+    } catch (e) {
+      console.warn('Keş təmizləmə xətası:', e);
+    }
+    location.reload(true);
+  }
+
   function ayarlarPaneliniAc() {
     document.getElementById('gunlukLimitInput').value = (typeof gunlukLimit === 'number') ? gunlukLimit : '';
     document.getElementById('gunlukLimitError').innerText = '';
