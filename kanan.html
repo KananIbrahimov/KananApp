@@ -994,7 +994,10 @@
               rp: { name: 'Günlük Xərclər' },
               user: { id: userId, name: 'istifadeci', displayName: 'Tətbiq istifadəçisi' },
               pubKeyCredParams: [{ type: 'public-key', alg: -7 }, { type: 'public-key', alg: -257 }],
-              authenticatorSelection: { authenticatorAttachment: 'platform', userVerification: 'required', residentKey: 'preferred' },
+              // residentKey: 'discouraged' -> iOS bunu "passkey" kimi yox, adi bir WebAuthn açarı kimi
+              // qeydə alır. Bu sayədə hər dəfə "Giriş Yap / Geçiş Anahtarını Kullan" marka ekranı
+              // çıxmır, çağırış birbaşa Face ID/Touch ID istəyinə keçir.
+              authenticatorSelection: { authenticatorAttachment: 'platform', userVerification: 'required', residentKey: 'discouraged' },
               timeout: 60000
             }
           });
