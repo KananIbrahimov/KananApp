@@ -1438,6 +1438,19 @@
       const remote = snap.data();
       if (!remote || !remote.data) return;
       if (remote.cihazId === cihazId) return; // artıq özümüzdə var
+
+      // Vaxt damğasını müqayisə et: gələn məlumat bizdəkindən KÖHNƏDİRSƏ, demək ki
+      // başqa (köhnəlmiş/keşlənmiş) bir sessiya köhnə vəziyyəti yenidən yazıb.
+      // Bu halda onu tətbiq ETMİRİK — əksinə öz (daha təzə) vəziyyətimizi yenidən
+      // göndəririk ki, sistem özü-özünü düzəltsin.
+      const remoteVaxt = remote.data.backupTarixi ? new Date(remote.data.backupTarixi).getTime() : 0;
+      const yerliVaxt = sonDeyisiklikVaxti ? new Date(sonDeyisiklikVaxti).getTime() : 0;
+      if (remoteVaxt < yerliVaxt) {
+        console.warn('Köhnəlmiş sinxron məlumatı rədd edildi, öz vəziyyət yenidən göndərilir.');
+        firebaseYazEt();
+        return;
+      }
+
       driveVerisiniTetbiqEt(remote.data);
       ekraniGuncelle();
       const hesablarModalEl = document.getElementById('hesablarModal');
