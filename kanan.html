@@ -447,33 +447,10 @@
   }
   .toggle-switch.on { background: var(--navy); }
   .toggle-switch.on::after { transform: translateX(18px); }
-
-  /* ==== Cihazlar arası: "başqa yerdə yeni məlumat var" bildirişi ==== */
-  .sync-banner {
-    position: fixed; top: 0; left: 0; right: 0; z-index: 150;
-    background: var(--navy); color: #fff; padding: 10px 16px;
-    display: none; align-items: center; justify-content: space-between; gap: 10px;
-    font-size: 13px; box-shadow: 0 2px 8px rgba(0,0,0,0.2);
-  }
-  .sync-banner.active { display: flex; }
-  .sync-banner button {
-    background: var(--gold); color: var(--navy); border: none; border-radius: 6px;
-    padding: 6px 12px; font-size: 12.5px; font-weight: 700; cursor: pointer; flex: 0 0 auto;
-  }
-  .sync-banner .sync-close { background: transparent; color: #fff; font-weight: 400; padding: 6px 4px; }
 </style>
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 </head>
 <body>
-
-<!-- Başqa cihazda daha yeni məlumat aşkarlananda görünür -->
-<div class="sync-banner" id="senkronBanner">
-  <span>🔄 Başqa cihazda daha yeni məlumat var.</span>
-  <div style="display:flex; gap:6px; align-items:center;">
-    <button onclick="senkronBannerYenile()">Yenilə</button>
-    <button class="sync-close" onclick="senkronBannerGizle()">✕</button>
-  </div>
-</div>
 
 <!-- Tətbiq kilidi: Face ID / Touch ID (WebAuthn) və ya ehtiyat PIN -->
 <div class="lock-screen" id="kilidEkrani">
@@ -520,32 +497,8 @@
   <button class="menu-item" id="menuHesablar" onclick="menuHesablarSec()">💰 Hesablar və Borclar</button>
   <button class="menu-item" id="menuAyarlar" onclick="menuAyarlarSec()">⚙️ Ayarlar</button>
   <div style="flex:1;"></div>
-  <div style="border-top:1px solid var(--line); padding-top:10px; margin-top:10px;">
-    <div class="drive-box" id="driveBox">
-      <div class="drive-status" id="driveStatus">☁️ Google Drive-a bağlı deyil</div>
-      <div class="drive-sub" id="driveSub">Bağlansan, "Göndər" və "Çək" düymələri ilə özün idarə edəcəksən.</div>
-      <div class="drive-sub" id="driveDebug" style="opacity:0.65;"></div>
-      <div class="drive-btns" id="driveBtns">
-        <button onclick="driveBaglan()">Bağlan</button>
-      </div>
-      <label id="driveAutoRow" style="display:none; align-items:center; justify-content:space-between; gap:8px; margin-top:9px; font-size:11.5px; color:var(--muted); cursor:pointer;">
-        <span>Hər dəyişiklikdə avtomatik göndər</span>
-        <input type="checkbox" id="driveAutoSyncCheckbox" onchange="driveOtomatikSyncToggle(this.checked)" style="width:auto; accent-color:var(--navy);">
-      </label>
-    </div>
-
-    <div class="drive-box" id="firebaseBox" style="margin-top:10px;">
-      <div class="drive-status" id="firebaseStatus">⚡ Anlıq sinxronizasiya bağlı deyil</div>
-      <div class="drive-sub" id="firebaseSub">Telefon və kompüter arasında 1-2 saniyədə avtomatik sinxron üçün bir Sync Key lazımdır.</div>
-      <div id="firebaseKeyGosterim" style="display:none; margin:8px 0; padding:8px; background:var(--bg); border:1px solid var(--line); border-radius:8px; font-size:11px; word-break:break-all; font-family:monospace; color:var(--ink);"></div>
-      <div class="drive-btns" id="firebaseBtns">
-        <button onclick="senkronKeyOlustur()">🔑 Yeni Sync Key yarat</button>
-        <button onclick="senkronKeyGirModalAc()">📋 Var olan Key-i gir</button>
-      </div>
-    </div>
-    <button class="menu-item" id="menuBackupIndir" onclick="backupIndir()">📥 Backup yüklə (JSON)</button>
-    <button class="menu-item" id="menuBackupBerpa" onclick="document.getElementById('backupFileInput').click()">📤 Backup bərpa et</button>
-    <input type="file" id="backupFileInput" accept="application/json" style="display:none;" onchange="backupBerpaEt(event)">
+  <div style="text-align:center; font-size:11px; color:var(--muted); padding:10px 0 4px; border-top:1px solid var(--line); margin-top:6px;">
+    Powered by Kanan Ibrahimov
   </div>
 </div>
 
@@ -711,6 +664,32 @@
       <p class="hint" style="margin:6px 0 0;">Açıq olanda tətbiqi hər açışda Face ID/Touch ID (dəstəklənmirsə PIN) ilə təsdiqləməli olursan.</p>
       <div class="error-text" id="kilidAyarError"></div>
     </div>
+
+    <h3 style="font-size:14px; margin:18px 0 10px; color:var(--ink);">☁️ Google Drive (əl ilə yedəkləmə)</h3>
+    <div class="drive-box" id="driveBox">
+      <div class="drive-status" id="driveStatus">☁️ Google Drive-a bağlı deyil</div>
+      <div class="drive-sub" id="driveSub">Bağlansan, "Göndər" və "Çək" düymələri ilə özün idarə edəcəksən.</div>
+      <div class="drive-sub" id="driveDebug" style="opacity:0.65;"></div>
+      <div class="drive-btns" id="driveBtns">
+        <button onclick="driveBaglan()">Bağlan</button>
+      </div>
+    </div>
+
+    <h3 style="font-size:14px; margin:18px 0 10px; color:var(--ink);">⚡ Anlıq sinxronizasiya (Firebase)</h3>
+    <div class="drive-box" id="firebaseBox">
+      <div class="drive-status" id="firebaseStatus">⚡ Anlıq sinxronizasiya bağlı deyil</div>
+      <div class="drive-sub" id="firebaseSub">Telefon və kompüter arasında 1-2 saniyədə avtomatik sinxron üçün bir Sync Key lazımdır.</div>
+      <div id="firebaseKeyGosterim" style="display:none; margin:8px 0; padding:8px; background:var(--bg); border:1px solid var(--line); border-radius:8px; font-size:11px; word-break:break-all; font-family:monospace; color:var(--ink);"></div>
+      <div class="drive-btns" id="firebaseBtns">
+        <button onclick="senkronKeyOlustur()">🔑 Yeni Sync Key yarat</button>
+        <button onclick="senkronKeyGirModalAc()">📋 Var olan Key-i gir</button>
+      </div>
+    </div>
+
+    <h3 style="font-size:14px; margin:18px 0 10px; color:var(--ink);">💾 Yedək faylı</h3>
+    <button class="btn btn-ghost" id="menuBackupIndir" style="width:100%; justify-content:flex-start; border:1px solid var(--line); margin-bottom:8px;" onclick="backupIndir()">📥 Backup yüklə (JSON)</button>
+    <button class="btn btn-ghost" id="menuBackupBerpa" style="width:100%; justify-content:flex-start; border:1px solid var(--line); margin-bottom:14px;" onclick="document.getElementById('backupFileInput').click()">📤 Backup bərpa et</button>
+    <input type="file" id="backupFileInput" accept="application/json" style="display:none;" onchange="backupBerpaEt(event)">
 
     <div class="modal-footer" style="justify-content:flex-end; margin-top:16px;">
       <button class="btn btn-ghost" onclick="ayarlarPaneliniKapat()">Bağla</button>
@@ -917,12 +896,6 @@
   let driveSyncGedirmi = false;
   let driveGeriCagirisFn = null;
   let sonDeyisiklikVaxti = null; // yerli son dəyişiklik vaxtı (ISO) - Drive ilə müqayisə üçün
-
-  // Avtomatik sinxronizasiya: hər dəyişiklikdən bir neçə saniyə sonra (debounce ilə)
-  // sakitcə tək bir "auto" faylını Drive-da yeniləyir (hər dəfə yeni fayl yaratmır).
-  let driveOtomatikSync = localStorage.getItem('drive_auto_sync') === '1';
-  let driveAutoFileId = localStorage.getItem('drive_auto_file_id') || null;
-  let driveAutoTimer = null;
 
   // ==================== Tema (Dark mode) ====================
   function temaTetbiqEt(tema) {
@@ -1149,10 +1122,8 @@
     if (!driveBagli) {
       statusEl.className = 'drive-status' + (xetaMi ? ' err' : '');
       statusEl.innerText = xetaMi ? ('⚠️ ' + mesaj) : '☁️ Google Drive-a bağlı deyil';
-      subEl.innerText = 'Bağlansan, "Göndər" və "Çək" düymələri ilə məlumatını özün idarə edə biləcəksən (istəsən avtomatik da qura bilərsən).';
+      subEl.innerText = 'Bağlansan, "Göndər" və "Çək" düymələri ilə məlumatını özün idarə edə biləcəksən.';
       btnsEl.innerHTML = '<button onclick="driveBaglan()">Bağlan</button>';
-      const autoRowHide = document.getElementById('driveAutoRow');
-      if (autoRowHide) autoRowHide.style.display = 'none';
       return;
     }
     if (driveSyncGedirmi) {
@@ -1167,12 +1138,6 @@
     }
     subEl.innerText = driveSonSync ? ('Son əməliyyat: ' + driveSonSync) : 'Hələ göndərilməyib/çəkilməyib.';
     btnsEl.innerHTML = '<button onclick="driveManualGonder()">📤 Drive-a göndər</button><button onclick="driveManualCek()">📥 Drive-dan çək</button><button onclick="driveBaglantiKes()">Bağlantını kəs</button>';
-    const autoRowEl = document.getElementById('driveAutoRow');
-    if (autoRowEl) {
-      autoRowEl.style.display = 'flex';
-      const cb = document.getElementById('driveAutoSyncCheckbox');
-      if (cb) cb.checked = driveOtomatikSync;
-    }
   }
 
   function driveBackupVerisi() {
@@ -1243,70 +1208,6 @@
     });
     if (!res.ok) throw new Error('upload-failed:' + res.status);
     return await res.json();
-  }
-
-  function driveOtomatikSyncToggle(checked) {
-    driveOtomatikSync = checked;
-    localStorage.setItem('drive_auto_sync', checked ? '1' : '0');
-    if (checked) driveOtomatikPlanla();
-  }
-
-  // Hər veriKaydet() çağırışında işə düşür, amma 4 saniyə "sakitlik" gözləyir ki,
-  // ard-arda bir neçə dəyişiklik edildikdə hər biri üçün ayrı sorğu getməsin.
-  function driveOtomatikPlanla() {
-    if (!driveBagli || !driveOtomatikSync) return;
-    clearTimeout(driveAutoTimer);
-    driveAutoTimer = setTimeout(driveOtomatikCalistir, 4000);
-  }
-
-  function driveOtomatikCalistir() {
-    if (!driveBagli || !driveOtomatikSync || driveSyncGedirmi) return;
-    driveTokenGerekliyse(true, async () => { // sessiz — istifadəçiyə pəncərə göstərmir
-      try {
-        await driveAutoYukleEt();
-        driveSonSyncQeydEt();
-        driveMenyuGuncelle();
-      } catch (e) {
-        driveMenyuGuncelle('Avtomatik göndərmə alınmadı.', true);
-      }
-    });
-  }
-
-  // Hər dəyişiklikdə YENİ fayl yaratmaq əvəzinə, tək bir "auto" faylını yerində yeniləyir.
-  // (Manual "Drive-a göndər" düyməsi isə hələ də tarix-möhürlü ayrıca versiyalar yaradır.)
-  async function driveAutoYukleEt() {
-    const data = driveBackupVerisi();
-    const body = JSON.stringify(data);
-    if (driveAutoFileId) {
-      const res = await fetch(`https://www.googleapis.com/upload/drive/v3/files/${driveAutoFileId}?uploadType=media`, {
-        method: 'PATCH',
-        headers: { Authorization: 'Bearer ' + driveAccessToken, 'Content-Type': 'application/json' },
-        body
-      });
-      if (res.status === 404) {
-        driveAutoFileId = null;
-        localStorage.removeItem('drive_auto_file_id');
-        return driveAutoYukleEt();
-      }
-      if (!res.ok) throw new Error('auto-upload-failed:' + res.status);
-      return await res.json();
-    }
-    const boundary = 'gidertakibi_auto_' + Date.now();
-    const metadata = { name: DRIVE_FILE_PREFIX + '_auto.json', mimeType: 'application/json' };
-    const multipartBody =
-      `--${boundary}\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n${JSON.stringify(metadata)}\r\n` +
-      `--${boundary}\r\nContent-Type: application/json\r\n\r\n${body}\r\n` +
-      `--${boundary}--`;
-    const res = await fetch(`https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart`, {
-      method: 'POST',
-      headers: { Authorization: 'Bearer ' + driveAccessToken, 'Content-Type': `multipart/related; boundary="${boundary}"` },
-      body: multipartBody
-    });
-    if (!res.ok) throw new Error('auto-create-failed:' + res.status);
-    const json = await res.json();
-    driveAutoFileId = json.id;
-    localStorage.setItem('drive_auto_file_id', driveAutoFileId);
-    return json;
   }
 
   function driveSonSyncQeydEt() {
@@ -1566,62 +1467,6 @@
   }
   // ==================== /Firebase ====================
 
-  // ==================== Cihazlar arası avtomatik yoxlama ====================
-  // Tətbiq açılanda (və ya bu tab yenidən aktiv olanda) səssizcə Drive-dakı "auto"
-  // faylının vaxtını yerli vaxtla müqayisə edir. Başqa cihazda daha yeni məlumat
-  // varsa, məlumatı SƏSSİZCƏ üstünə yazmır — yalnız yuxarıda kiçik bir "Yenilə"
-  // bildirişi göstərir, tətbiqi isə istifadəçi özü tıklayanda yeniləyir.
-  let senkronGozlemedeFileId = null;
-
-  function senkronBannerGoster() { document.getElementById('senkronBanner').classList.add('active'); }
-  function senkronBannerGizle() { document.getElementById('senkronBanner').classList.remove('active'); }
-
-  function driveOtomatikYoxla() {
-    if (!driveBagli || driveSyncGedirmi) return;
-    driveTokenGerekliyse(true, async () => { // sessiz — pəncərə açmır
-      try {
-        const q = encodeURIComponent(`name='${DRIVE_FILE_PREFIX}_auto.json' and trashed=false`);
-        const res = await fetch(`https://www.googleapis.com/drive/v3/files?q=${q}&spaces=drive&fields=files(id,modifiedTime)`, {
-          headers: { Authorization: 'Bearer ' + driveAccessToken }
-        });
-        if (!res.ok) return;
-        const data = await res.json();
-        const f = (data.files || [])[0];
-        if (!f) return;
-        const remoteVaxt = new Date(f.modifiedTime).getTime();
-        const yerliVaxt = sonDeyisiklikVaxti ? new Date(sonDeyisiklikVaxti).getTime() : 0;
-        // 5 saniyədən artıq fərq olanda göstər — kiçik saat fərqlərindən bildiriş çıxmasın
-        if (remoteVaxt > yerliVaxt + 5000) {
-          senkronGozlemedeFileId = f.id;
-          senkronBannerGoster();
-        }
-      } catch (e) { /* səssizcə keç — bu arxa fon yoxlamasıdır */ }
-    });
-  }
-
-  async function senkronBannerYenile() {
-    senkronBannerGizle();
-    if (!senkronGozlemedeFileId) return;
-    driveSyncGedirmi = true;
-    driveMenyuGuncelle();
-    try {
-      const remote = await driveFayliOxu(senkronGozlemedeFileId);
-      driveVerisiniTetbiqEt(remote);
-      ekraniGuncelle();
-      const hesablarModalEl = document.getElementById('hesablarModal');
-      if (hesablarModalEl && hesablarModalEl.classList.contains('active') && typeof hesablarGoster === 'function') {
-        hesablarGoster();
-        if (typeof krediBorcuGoster === 'function') krediBorcuGoster();
-      }
-      driveSonSyncQeydEt();
-    } catch (e) {
-      driveMenyuGuncelle('Yenilənmə alınmadı: ' + (e && e.message ? e.message : e), true);
-    }
-    driveSyncGedirmi = false;
-    driveMenyuGuncelle();
-  }
-  // ==================== /Cihazlar arası avtomatik yoxlama ====================
-
   let aktifDonem = 'gunluk';
   let goruntulenenTarix = new Date(); goruntulenenTarix.setHours(0, 0, 0, 0);
   let kategoriler = [];
@@ -1726,7 +1571,6 @@
     try {
       sonDeyisiklikVaxti = new Date().toISOString();
       localStorage.setItem(STORAGE_KEY, JSON.stringify({ kategoriler, giderler, anaHesap, kreditLimit, krediBorcu, nagdBakiye, debitBakiye, depozitBakiye, hesabTransferleri, gunlukLimit, sonDeyisiklikVaxti }));
-      driveOtomatikPlanla();
       firebaseYazPlanla();
     } catch (e) {
       console.error('Yadda saxlama xətası:', e);
@@ -2534,6 +2378,8 @@
     document.getElementById('gunlukLimitInput').value = (typeof gunlukLimit === 'number') ? gunlukLimit : '';
     document.getElementById('gunlukLimitError').innerText = '';
     kilidAyarGoster();
+    driveMenyuGuncelle();
+    firebasePanelGuncelle();
     modalAc('ayarlarModal');
   }
   function ayarlarPaneliniKapat() {
@@ -2928,17 +2774,8 @@
 
   veriYukle();
   kilidYoxla();
-  driveOtomatikYoxla();
   firebaseBaslat();
   firebasePanelGuncelle(); // localStorage-dakı mövcud Sync Key-i dərhal göstər (şəbəkəni gözləmədən)
-
-  // Tab yenidən aktiv olanda (istifadəçi başqa tətbiqdən qayıdanda) da yoxla —
-  // beləliklə telefon/kompüter arasında keçəndə əl ilə "çək" düyməsinə basmadan xəbərdar olursan.
-  document.addEventListener('visibilitychange', () => {
-    if (document.visibilityState === 'visible') driveOtomatikYoxla();
-  });
-  // Tətbiq açıq qaldığı müddətdə də hər 3 dəqiqədən bir səssizcə yoxla.
-  setInterval(driveOtomatikYoxla, 3 * 60 * 1000);
 
   // ==== PWA: Service Worker qeydiyyatı ====
   // Yalnız http(s):// üzərində işləyir; file:// ilə açsan səssizcə keçilir.
