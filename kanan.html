@@ -16,6 +16,10 @@
 <meta name="apple-mobile-web-app-title" content="Xərclər">
 <!-- Chart.js: Aylıq xülasədəki pasta və trend qrafikləri üçün (internet lazımdır) -->
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
+<!-- Firebase: telefon/kompüter arasında anlıq (1-2 saniyəlik) sinxronizasiya üçün -->
+<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore-compat.js"></script>
 <style>
   :root{
     --bg: #eef1f6;
@@ -529,6 +533,16 @@
         <input type="checkbox" id="driveAutoSyncCheckbox" onchange="driveOtomatikSyncToggle(this.checked)" style="width:auto; accent-color:var(--navy);">
       </label>
     </div>
+
+    <div class="drive-box" id="firebaseBox" style="margin-top:10px;">
+      <div class="drive-status" id="firebaseStatus">⚡ Anlıq sinxronizasiya bağlı deyil</div>
+      <div class="drive-sub" id="firebaseSub">Telefon və kompüter arasında 1-2 saniyədə avtomatik sinxron üçün bir Sync Key lazımdır.</div>
+      <div id="firebaseKeyGosterim" style="display:none; margin:8px 0; padding:8px; background:var(--bg); border:1px solid var(--line); border-radius:8px; font-size:11px; word-break:break-all; font-family:monospace; color:var(--ink);"></div>
+      <div class="drive-btns" id="firebaseBtns">
+        <button onclick="senkronKeyOlustur()">🔑 Yeni Sync Key yarat</button>
+        <button onclick="senkronKeyGirModalAc()">📋 Var olan Key-i gir</button>
+      </div>
+    </div>
     <button class="menu-item" id="menuBackupIndir" onclick="backupIndir()">📥 Backup yüklə (JSON)</button>
     <button class="menu-item" id="menuBackupBerpa" onclick="document.getElementById('backupFileInput').click()">📤 Backup bərpa et</button>
     <input type="file" id="backupFileInput" accept="application/json" style="display:none;" onchange="backupBerpaEt(event)">
@@ -589,6 +603,20 @@
     <div class="modal-footer">
       <button class="btn btn-ghost" onclick="modalKapat('newCatModal')">Ləğv et</button>
       <button class="btn btn-primary" onclick="yeniKategoriOnayla()">Əlavə et</button>
+    </div>
+  </div>
+</div>
+
+<!-- Firebase Sync Key gir (başqa cihazdakı key ilə bağlan) -->
+<div id="senkronKeyGirModal" class="modal">
+  <div class="modal-content">
+    <h2>Sync Key gir</h2>
+    <p class="hint">Digər cihazında yaratdığın Sync Key-i bura yapışdır. İkisi eyni olanda o iki cihaz avtomatik sinxronlaşır.</p>
+    <input type="text" id="senkronKeyGirInput" placeholder="Sync Key" style="font-family:monospace; font-size:12px;">
+    <div class="error-text" id="senkronKeyGirError"></div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="modalKapat('senkronKeyGirModal')">Ləğv et</button>
+      <button class="btn btn-primary" onclick="senkronKeyGirOnayla()">Bağlan</button>
     </div>
   </div>
 </div>
@@ -1373,6 +1401,171 @@
   }
   // ==================== /Google Drive ====================
 
+  // ==================== Firebase: anlıq (real-time) sinxronizasiya ====================
+  // Drive-dan fərqli olaraq bura POLLING (nə vaxtsa yoxlamaq) YOX — Firestore
+  // dəyişikliyi ANINDA (adətən 1 saniyədən az) digər açıq cihazlara "itələyir".
+  // Təhlükəsizlik: giriş şifrə ilə deyil, uzun/rastgele "Sync Key" ilədir — key-i
+  // yalnız öz cihazlarına yaz, kimsə ilə paylaşma (onu bilən, məlumatına baxa bilər).
+  const firebaseConfig = {
+    apiKey: "AIzaSyBGpwU5D_dYxAUk-RTymjK_rq1K9VL3V0E",
+    authDomain: "kananapp-8d1c3.firebaseapp.com",
+    projectId: "kananapp-8d1c3",
+    storageBucket: "kananapp-8d1c3.firebasestorage.app",
+    messagingSenderId: "464092357661",
+    appId: "1:464092357661:web:bbe87e89cf467b8dfdd2f4"
+  };
+
+  let firestoreDb = null;
+  let firebaseHazir = false;
+  let firebaseUnsubscribe = null;
+  let firebaseYazTimer = null;
+  let senkronKey = localStorage.getItem('firebase_sync_key') || null;
+  let cihazId = localStorage.getItem('device_id') || null;
+  if (!cihazId) {
+    cihazId = 'cihaz_' + Date.now().toString(36) + '_' + Math.random().toString(36).slice(2, 10);
+    localStorage.setItem('device_id', cihazId);
+  }
+
+  function uzunRastgeleKod(uzunluq) {
+    const bytes = crypto.getRandomValues(new Uint8Array(uzunluq));
+    return Array.from(bytes, b => b.toString(16).padStart(2, '0')).join('').slice(0, uzunluq);
+  }
+
+  function firebaseBaslat() {
+    if (typeof firebase === 'undefined') return; // internet yoxdursa SDK yüklənməyib, səssizcə keç
+    try {
+      firebase.initializeApp(firebaseConfig);
+      firestoreDb = firebase.firestore();
+      firebase.auth().signInAnonymously().then(() => {
+        firebaseHazir = true;
+        if (senkronKey) firebaseDinlemeyeBasla();
+        firebasePanelGuncelle();
+      }).catch((e) => {
+        console.warn('Firebase giriş xətası:', e);
+        firebasePanelGuncelle('Bağlantı alınmadı.', true);
+      });
+    } catch (e) {
+      console.warn('Firebase başlatma xətası:', e);
+    }
+  }
+
+  function firebasePanelGuncelle(mesaj, xetaMi) {
+    const statusEl = document.getElementById('firebaseStatus');
+    const subEl = document.getElementById('firebaseSub');
+    const keyGosterimEl = document.getElementById('firebaseKeyGosterim');
+    const btnsEl = document.getElementById('firebaseBtns');
+    if (!statusEl) return;
+
+    if (xetaMi) {
+      statusEl.innerText = '⚠️ ' + (mesaj || 'Xəta baş verdi.');
+    } else if (senkronKey) {
+      statusEl.innerText = '⚡ Anlıq sinxronizasiya aktiv';
+    } else {
+      statusEl.innerText = '⚡ Anlıq sinxronizasiya bağlı deyil';
+    }
+
+    if (senkronKey) {
+      subEl.innerText = 'Bu Sync Key-i digər cihazına da (bir dəfə) daxil et ki, ikisi avtomatik sinxronlaşsın.';
+      keyGosterimEl.style.display = 'block';
+      keyGosterimEl.innerText = senkronKey;
+      btnsEl.innerHTML = '<button onclick="senkronKeyKopyala()">📋 Kopyala</button><button onclick="senkronKeySil()">Bağlantını kəs</button>';
+    } else {
+      subEl.innerText = 'Telefon və kompüter arasında 1-2 saniyədə avtomatik sinxron üçün bir Sync Key lazımdır.';
+      keyGosterimEl.style.display = 'none';
+      btnsEl.innerHTML = '<button onclick="senkronKeyOlustur()">🔑 Yeni Sync Key yarat</button><button onclick="senkronKeyGirModalAc()">📋 Var olan Key-i gir</button>';
+    }
+  }
+
+  function senkronKeyOlustur() {
+    senkronKey = uzunRastgeleKod(32);
+    localStorage.setItem('firebase_sync_key', senkronKey);
+    firebasePanelGuncelle();
+    firebaseDinlemeyeBasla();
+    firebaseYazEt(); // yerli məlumatı dərhal göndər ki, ilk andan Sync Key işlək olsun
+  }
+
+  function senkronKeyKopyala() {
+    if (!senkronKey) return;
+    navigator.clipboard.writeText(senkronKey).then(() => {
+      firebasePanelGuncelle('Kopyalandı!');
+      setTimeout(() => firebasePanelGuncelle(), 1500);
+    }).catch(() => alert('Kopyalanmadı, əl ilə seçib kopyala: ' + senkronKey));
+  }
+
+  function senkronKeySil() {
+    confirmAc('Sinxronizasiyanı kəs', 'Bu cihazı Sync Key-dən ayırmaq istəyirsən? Digər cihazlar öz Key-lərini saxlayacaq.', () => {
+      if (firebaseUnsubscribe) { firebaseUnsubscribe(); firebaseUnsubscribe = null; }
+      senkronKey = null;
+      localStorage.removeItem('firebase_sync_key');
+      firebasePanelGuncelle();
+    });
+  }
+
+  function senkronKeyGirModalAc() {
+    document.getElementById('senkronKeyGirInput').value = '';
+    document.getElementById('senkronKeyGirError').innerText = '';
+    modalAc('senkronKeyGirModal');
+  }
+
+  function senkronKeyGirOnayla() {
+    const val = document.getElementById('senkronKeyGirInput').value.trim();
+    if (!val) {
+      document.getElementById('senkronKeyGirError').innerText = 'Sync Key yaz.';
+      return;
+    }
+    senkronKey = val;
+    localStorage.setItem('firebase_sync_key', senkronKey);
+    modalKapat('senkronKeyGirModal');
+    firebasePanelGuncelle();
+    firebaseDinlemeyeBasla();
+  }
+
+  function firebaseDinlemeyeBasla() {
+    if (!firebaseHazir || !senkronKey || !firestoreDb) return;
+    if (firebaseUnsubscribe) { firebaseUnsubscribe(); firebaseUnsubscribe = null; }
+    firebaseUnsubscribe = firestoreDb.collection('syncs').doc(senkronKey).onSnapshot((snap) => {
+      if (!snap.exists) return;
+      if (snap.metadata.hasPendingWrites) return; // öz yazdığımızın əks-sədasıdır, gözlə
+      const remote = snap.data();
+      if (!remote || !remote.data) return;
+      if (remote.cihazId === cihazId) return; // artıq özümüzdə var
+      driveVerisiniTetbiqEt(remote.data);
+      ekraniGuncelle();
+      const hesablarModalEl = document.getElementById('hesablarModal');
+      if (hesablarModalEl && hesablarModalEl.classList.contains('active') && typeof hesablarGoster === 'function') {
+        hesablarGoster();
+        if (typeof krediBorcuGoster === 'function') krediBorcuGoster();
+      }
+      driveSonSyncQeydEt();
+    }, (err) => {
+      console.warn('Firestore dinləmə xətası:', err);
+      firebasePanelGuncelle('Dinləmə kəsildi.', true);
+    });
+  }
+
+  // Hər veriKaydet()-dən ~600ms sonra (debounce ilə) Firestore-a yazır — bu, Drive-ın
+  // auto-sync-indən fərqli olaraq, anında "push" təbiətli olduğu üçün çox qısa gözləmə kifayətdir.
+  function firebaseYazPlanla() {
+    if (!firebaseHazir || !senkronKey) return;
+    clearTimeout(firebaseYazTimer);
+    firebaseYazTimer = setTimeout(firebaseYazEt, 600);
+  }
+
+  async function firebaseYazEt() {
+    if (!firebaseHazir || !senkronKey || !firestoreDb) return;
+    try {
+      await firestoreDb.collection('syncs').doc(senkronKey).set({
+        data: driveBackupVerisi(),
+        cihazId,
+        updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+      });
+    } catch (e) {
+      console.warn('Firestore yazma xətası:', e);
+      firebasePanelGuncelle('Göndərmə alınmadı.', true);
+    }
+  }
+  // ==================== /Firebase ====================
+
   // ==================== Cihazlar arası avtomatik yoxlama ====================
   // Tətbiq açılanda (və ya bu tab yenidən aktiv olanda) səssizcə Drive-dakı "auto"
   // faylının vaxtını yerli vaxtla müqayisə edir. Başqa cihazda daha yeni məlumat
@@ -1534,6 +1727,7 @@
       sonDeyisiklikVaxti = new Date().toISOString();
       localStorage.setItem(STORAGE_KEY, JSON.stringify({ kategoriler, giderler, anaHesap, kreditLimit, krediBorcu, nagdBakiye, debitBakiye, depozitBakiye, hesabTransferleri, gunlukLimit, sonDeyisiklikVaxti }));
       driveOtomatikPlanla();
+      firebaseYazPlanla();
     } catch (e) {
       console.error('Yadda saxlama xətası:', e);
     }
@@ -2735,6 +2929,8 @@
   veriYukle();
   kilidYoxla();
   driveOtomatikYoxla();
+  firebaseBaslat();
+  firebasePanelGuncelle(); // localStorage-dakı mövcud Sync Key-i dərhal göstər (şəbəkəni gözləmədən)
 
   // Tab yenidən aktiv olanda (istifadəçi başqa tətbiqdən qayıdanda) da yoxla —
   // beləliklə telefon/kompüter arasında keçəndə əl ilə "çək" düyməsinə basmadan xəbərdar olursan.
