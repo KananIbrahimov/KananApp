@@ -266,6 +266,7 @@
   #senkronKeyGirModal { z-index: 70; }
   #pinAyarlaModal { z-index: 70; }
   #islemFormModal { z-index: 70; }
+  #hesabSecModal { z-index: 70; }
   .monthly-item { display: flex; justify-content: space-between; align-items: center; gap: 10px; }
   .monthly-item .left { display: flex; align-items: center; gap: 10px; min-width: 0; }
   .monthly-item .icon { font-size: 18px; }
@@ -366,6 +367,41 @@
     font-size: 12.5px; color: #dfe4f0;
   }
   .debt-breakdown-row .dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; margin-right: 6px; }
+
+  /* Dashboard: circular (doughnut) charts */
+  .pie-card {
+    background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius-lg);
+    padding: 16px 16px 14px; margin-bottom: 12px;
+  }
+  .pie-card .pie-title { font-size: 13px; font-weight: 700; color: var(--ink); margin-bottom: 10px; }
+  .pie-card-row { display: flex; align-items: center; gap: 16px; }
+  .pie-canvas-wrap { position: relative; width: 108px; height: 108px; flex: none; }
+  .pie-canvas-wrap canvas { width: 100% !important; height: 100% !important; }
+  .pie-center-label { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; flex-direction: column; pointer-events: none; }
+  .pie-center-label .n { font-size: 14px; font-weight: 700; color: var(--ink); }
+  .pie-center-label .l { font-size: 9.5px; color: var(--muted); margin-top: 1px; }
+  .pie-legend { display: flex; flex-direction: column; gap: 7px; flex: 1; min-width: 0; }
+  .pie-legend-row { display: flex; justify-content: space-between; gap: 8px; font-size: 12px; color: var(--ink); }
+  .pie-legend-row .dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; margin-right: 6px; flex: none; }
+  .pie-legend-row .lbl { display: flex; align-items: center; color: var(--muted); min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .pie-legend-row .amt { font-weight: 700; flex: none; }
+  .pie-empty { font-size: 12.5px; color: var(--muted); padding: 6px 0; }
+
+  /* Hesablar: add-account ("+") picker */
+  .hesab-add-head { display: flex; align-items: center; justify-content: space-between; margin: 4px 0 10px; }
+  .hesab-add-head h3 { margin: 0; font-size: 14px; color: var(--ink); }
+  .hesab-add-btn {
+    width: 32px; height: 32px; border-radius: 50%; border: none; background: var(--navy);
+    color: #fff; font-size: 19px; line-height: 1; cursor: pointer; display: flex;
+    align-items: center; justify-content: center; flex: none;
+  }
+  .hesab-sec-item {
+    display: flex; align-items: center; gap: 10px; width: 100%; text-align: left;
+    padding: 12px 12px; border: 1px solid var(--line); border-radius: var(--radius-md);
+    background: var(--panel-alt); cursor: pointer; margin-bottom: 8px; font-size: 14px; color: var(--ink);
+  }
+  .hesab-sec-item .ic { font-size: 19px; }
+  .hesab-sec-item small { display: block; color: var(--muted); font-size: 11.5px; font-weight: 400; margin-top: 1px; }
 
   /* Monthly installment column chart */
   .taksit-chart { display: flex; align-items: flex-end; gap: 6px; margin-bottom: 16px; overflow-x: auto; padding-bottom: 2px; }
@@ -491,17 +527,40 @@
     <div style="padding-bottom:12px; margin-bottom:4px;">
       <h2 style="margin:0;">Dashboard</h2>
     </div>
-    <div class="debt-summary-card">
-      <div class="debt-summary-label">Kredit kartımın güncəl borcu</div>
-      <div class="debt-summary-amount" id="dashAnaHesapDeger">—</div>
+
+    <!-- 1. Ümumi Borc — dairəvi diaqram -->
+    <div class="pie-card">
+      <div class="pie-title">📊 Ümumi borc</div>
+      <div class="pie-card-row">
+        <div class="pie-canvas-wrap"><canvas id="dashUmumiBorcCanvas"></canvas>
+          <div class="pie-center-label"><span class="n" id="dashUmumiBorcMerkez">—</span><span class="l">cəm</span></div>
+        </div>
+        <div class="pie-legend" id="dashUmumiBorcLegend"></div>
+      </div>
     </div>
-    <div class="menu-balance-card">
-      <div class="k">Kredit kartı balansı (istifadə edilə bilən)</div>
-      <div class="v" id="dashKrediBalansDeger">—</div>
-      <div class="v2">Kredit limiti: <b id="dashKreditLimitDeger">—</b></div>
+
+    <!-- 2. Kredit kartı — istifadə olunan / istifadə edilə bilən — dairəvi diaqram -->
+    <div class="pie-card">
+      <div class="pie-title">💳 Kredit kartı limiti</div>
+      <div class="pie-card-row">
+        <div class="pie-canvas-wrap"><canvas id="dashKrediKartCanvas"></canvas>
+          <div class="pie-center-label"><span class="n" id="dashKrediKartMerkez">—</span><span class="l">limit</span></div>
+        </div>
+        <div class="pie-legend" id="dashKrediKartLegend"></div>
+      </div>
     </div>
-    <button class="btn btn-primary" onclick="balanceModalAc()" style="width:100%; margin-bottom:10px;">Kredit kartını düzəlt</button>
-    <button class="btn btn-ghost" style="width:100%; border:1px solid var(--line);" onclick="sekmeSec('hesablar')">💰 Hesablar və Borclara bax</button>
+
+    <!-- 3. Kredit borcu (taksit) — ödənilib / qalıb — dairəvi diaqram -->
+    <div class="pie-card">
+      <div class="pie-title">🧾 Kredit borcu — taksit ödənilib</div>
+      <div class="pie-card-row">
+        <div class="pie-canvas-wrap"><canvas id="dashKrediBorcuCanvas"></canvas>
+          <div class="pie-center-label"><span class="n" id="dashKrediBorcuMerkez">—</span><span class="l">taksit</span></div>
+        </div>
+        <div class="pie-legend" id="dashKrediBorcuLegend"></div>
+      </div>
+    </div>
+
   </div>
 </div>
 
@@ -816,40 +875,31 @@
       <h2 style="margin:0; flex:1;">Hesablar və Borclar</h2>
     </div>
 
-    <!-- Combined debts chart: Kredi kartı borcu + Deposit Borcu + Kredit borcu -->
-    <div class="debt-summary-card">
-      <div class="debt-summary-label">Ümumi borc</div>
-      <div class="debt-summary-amount" id="guncelBorcCemi">—</div>
-      <div class="debt-chart-container" id="guncelBorcQrafik"></div>
-      <div class="debt-breakdown" id="guncelBorcBreakdown"></div>
+    <div class="hesab-add-head" style="margin-top:6px;">
+      <h3>Hesablarım</h3>
+      <button class="hesab-add-btn" onclick="hesabSecModalAc()" title="Hesab əlavə et">+</button>
     </div>
-
-    <!-- Kredit borcu (taksitli kredit) — konfiqurasiya bu pəncərədən edilir -->
-    <button class="btn btn-primary" id="krediBorcuOdeBtn" onclick="krediBorcuOde()" style="width:100%; margin-bottom:12px;">Bu ayın taksitini ödə (kredit kartından)</button>
-    <p class="hint" id="krediBorcuTarixler">—</p>
-    <div class="ay-total-row" style="margin-bottom:12px;">
-      <span>Aylıq taksit</span>
-      <span style="display:flex; align-items:center; gap:8px;">
-        <span id="krediBorcuMebleg">—</span>
-        <button class="btn btn-ghost" onclick="krediBorcuDuzeltModalAc()" style="padding:5px 10px; font-size:12px;">Düzəlt</button>
-      </span>
-    </div>
-    <div style="display:flex; justify-content:space-between; font-size:12.5px; color:var(--muted); margin-bottom:8px;">
-      <span id="krediBorcuIrəliləyiş">—</span>
-      <span id="krediBorcuQalan">—</span>
-    </div>
-    <div id="krediBorcuAylikQrafik" class="taksit-chart"></div>
-    <div class="error-text" id="krediBorcuError"></div>
-
-    <div class="history-head" style="margin-top:4px;"><span>Son transferlər</span></div>
-    <div id="hesabTransferTarixce" class="modal-list" style="max-height:160px; flex:none;"></div>
-
     <p class="hint">Hesablarının balansına bax, düzəlt və aralarında transfer et.</p>
     <div id="hesablarKartlari" class="modal-list" style="gap:10px; flex:none; overflow:visible; max-height:none;"></div>
     <button class="btn btn-primary" onclick="transferModalAc()" style="width:100%; margin-bottom:14px;">🔁 Hesablar arası transfer</button>
 
+    <div class="history-head" style="margin-top:4px;"><span>Son transferlər</span></div>
+    <div id="hesabTransferTarixce" class="modal-list" style="max-height:160px; flex:none; margin-bottom:14px;"></div>
+
     <div class="modal-footer" style="justify-content:flex-end;">
       <button class="btn btn-ghost" onclick="hesablarPaneliniKapat()">Bağla</button>
+    </div>
+  </div>
+</div>
+
+<!-- Hesab əlavə et: 5 seçim -->
+<div id="hesabSecModal" class="modal">
+  <div class="modal-content">
+    <h2>Hansı hesabı əlavə edirsən?</h2>
+    <p class="hint">Bir hesab növü seç, sonra ondan istəniləni doldur.</p>
+    <div id="hesabSecListesi"></div>
+    <div class="modal-footer" style="justify-content:flex-end;">
+      <button class="btn btn-ghost" onclick="modalKapat('hesabSecModal')">Ləğv et</button>
     </div>
   </div>
 </div>
@@ -889,6 +939,7 @@
         <option value="depozit">🏛️ Bank Deposit Hesabım</option>
         <option value="kredit">💳 Kredi kartı Hesabım</option>
         <option value="nagd">💵 Cash Hesab</option>
+        <option value="krediXett">🧾 Kredit xətt (ödəniş)</option>
       </select>
     </div>
     <div style="margin-bottom:6px;">
@@ -1169,7 +1220,7 @@
   }
 
   function driveBackupVerisi() {
-    return { kategoriler, giderler, anaHesap, kreditLimit, krediBorcu, nagdBakiye, debitBakiye, depozitBakiye, hesabTransferleri, gunlukLimit, backupTarixi: sonDeyisiklikVaxti || new Date().toISOString() };
+    return { kategoriler, giderler, anaHesap, kreditLimit, krediBorcu, nagdBakiye, debitBakiye, depozitBakiye, hesabTransferleri, gunlukLimit, hesabEklenib, backupTarixi: sonDeyisiklikVaxti || new Date().toISOString() };
   }
 
   function driveYeniBackupAdi() {
@@ -1203,9 +1254,10 @@
     depozitBakiye = (typeof parsed.depozitBakiye === 'number') ? parsed.depozitBakiye : 0;
     hesabTransferleri = parsed.hesabTransferleri || [];
     gunlukLimit = (typeof parsed.gunlukLimit === 'number') ? parsed.gunlukLimit : null;
+    hesabEklenib = parsed.hesabEklenib || { nagd: false, debit: false, depozit: false };
     sonDeyisiklikVaxti = parsed.backupTarixi || new Date().toISOString();
     try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify({ kategoriler, giderler, anaHesap, kreditLimit, krediBorcu, nagdBakiye, debitBakiye, depozitBakiye, hesabTransferleri, gunlukLimit, sonDeyisiklikVaxti }));
+      localStorage.setItem(STORAGE_KEY, JSON.stringify({ kategoriler, giderler, anaHesap, kreditLimit, krediBorcu, nagdBakiye, debitBakiye, depozitBakiye, hesabTransferleri, gunlukLimit, hesabEklenib, sonDeyisiklikVaxti }));
     } catch (e) { console.error('Yadda saxlama xətası:', e); }
   }
 
@@ -1530,9 +1582,13 @@
   let depozitBakiye = 0; // Bank Deposit Hesabım
   let hesabTransferleri = []; // hesablar arası transfer tarixçəsi
   let gunlukLimit = null; // gündəlik xərc limiti — istifadəçi "Ayarlar" bölməsindən özü təyin edir, invented default yoxdur
+  let hesabEklenib = { nagd: false, debit: false, depozit: false }; // hansı hesablar "+" ilə əlavə edilib — kredit/kredit xətt öz sahələrindən (kreditLimit / krediBorcu) məlumdur
   let veriYuklendi = false;
   let aylikPastaChart = null; // Chart.js: kateqoriya dağılımı (pasta)
   let aylikTrendChart = null; // Chart.js: günlük xərc trendi (xətt)
+  let dashUmumiBorcChart = null; // Chart.js: dashboard — ümumi borc dairəvi diaqramı
+  let dashKrediKartChart = null; // Chart.js: dashboard — kredit kartı limiti dairəvi diaqramı
+  let dashKrediBorcuChart = null; // Chart.js: dashboard — kredit borcu (taksit) dairəvi diaqramı
 
   function cssVar(ad) {
     return getComputedStyle(document.documentElement).getPropertyValue(ad).trim();
@@ -1588,6 +1644,7 @@
         depozitBakiye = (typeof parsed.depozitBakiye === 'number') ? parsed.depozitBakiye : 0;
         hesabTransferleri = parsed.hesabTransferleri || [];
         gunlukLimit = (typeof parsed.gunlukLimit === 'number') ? parsed.gunlukLimit : null;
+        hesabEklenib = parsed.hesabEklenib || { nagd: false, debit: false, depozit: false };
         sonDeyisiklikVaxti = parsed.sonDeyisiklikVaxti || null;
       } else {
         kategoriler = varsayilanKategoriler;
@@ -1600,6 +1657,7 @@
         depozitBakiye = 0;
         hesabTransferleri = [];
         gunlukLimit = null;
+        hesabEklenib = { nagd: false, debit: false, depozit: false };
         sonDeyisiklikVaxti = null;
       }
     } catch (e) {
@@ -1613,6 +1671,7 @@
       depozitBakiye = 0;
       hesabTransferleri = [];
       gunlukLimit = null;
+      hesabEklenib = { nagd: false, debit: false, depozit: false };
     }
   }
 
@@ -1664,7 +1723,7 @@
   async function veriKaydet() {
     try {
       sonDeyisiklikVaxti = new Date().toISOString();
-      localStorage.setItem(STORAGE_KEY, JSON.stringify({ kategoriler, giderler, anaHesap, kreditLimit, krediBorcu, nagdBakiye, debitBakiye, depozitBakiye, hesabTransferleri, gunlukLimit, sonDeyisiklikVaxti }));
+      localStorage.setItem(STORAGE_KEY, JSON.stringify({ kategoriler, giderler, anaHesap, kreditLimit, krediBorcu, nagdBakiye, debitBakiye, depozitBakiye, hesabTransferleri, gunlukLimit, hesabEklenib, sonDeyisiklikVaxti }));
       firebaseYazPlanla();
     } catch (e) {
       console.error('Yadda saxlama xətası:', e);
@@ -1673,7 +1732,7 @@
 
   // ---- Backup: JSON endir / bərpa et ----
   function backupIndir() {
-    const data = { kategoriler, giderler, anaHesap, kreditLimit, krediBorcu, nagdBakiye, debitBakiye, depozitBakiye, hesabTransferleri, gunlukLimit, backupTarixi: new Date().toISOString() };
+    const data = { kategoriler, giderler, anaHesap, kreditLimit, krediBorcu, nagdBakiye, debitBakiye, depozitBakiye, hesabTransferleri, gunlukLimit, hesabEklenib, backupTarixi: new Date().toISOString() };
     const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
     const url = URL.createObjectURL(blob);
     const tarixEtiket = new Date().toISOString().slice(0, 10);
@@ -1705,6 +1764,7 @@
           depozitBakiye = (typeof parsed.depozitBakiye === 'number') ? parsed.depozitBakiye : 0;
           hesabTransferleri = parsed.hesabTransferleri || [];
           gunlukLimit = (typeof parsed.gunlukLimit === 'number') ? parsed.gunlukLimit : null;
+          hesabEklenib = parsed.hesabEklenib || { nagd: false, debit: false, depozit: false };
           veriKaydet();
           ekraniGuncelle();
           menuKapat();
@@ -1829,6 +1889,10 @@
 
   function ekraniGuncelle() {
     if (!veriYuklendi) return;
+    const dashboardModalEl = document.getElementById('dashboardModal');
+    if (dashboardModalEl && dashboardModalEl.classList.contains('active') && typeof dashboardDairaviDiaqramlariCiz === 'function') {
+      dashboardDairaviDiaqramlariCiz();
+    }
     const tarixBugun = tarixBugunmu(goruntulenenTarix);
     const tarixEtiketiEl = document.getElementById('tarixEtiketi');
     if (tarixEtiketiEl) {
@@ -2263,7 +2327,7 @@
     if (!krediBorcu) {
       krediBorcu = {
         id: 'kredi_borcu_' + idUret(), ad: 'Kredi Borcu',
-        odenmisTaksitSayi: 0, sonOdenenAy: null, odenenMebleg: null
+        odenmisTaksitSayi: 0, sonOdenenAy: null, odenenMebleg: null, elaveOdenis: 0
       };
     }
     krediBorcu.aylikMebleg = mebleg;
@@ -2278,109 +2342,18 @@
     ekraniGuncelle();
   }
 
-  // Combined debt chart for the Güncel Borclar panel: Kredi kartı borcu + Deposit Borcu + Kredit borcu
-  function guncelBorclarQrafikGoster() {
-    const kkBorcu = (typeof anaHesap === 'number' && anaHesap < 0) ? Math.abs(anaHesap) : 0;
-    const depozitBorcu = (typeof depozitBakiye === 'number' && depozitBakiye < 0) ? Math.abs(depozitBakiye) : 0;
-    const krediBorcuQalan = krediBorcu ? (krediBorcu.taksitSayi - krediBorcu.odenmisTaksitSayi) * krediBorcu.aylikMebleg : 0;
-    const cemi = kkBorcu + depozitBorcu + krediBorcuQalan;
-
-    document.getElementById('guncelBorcCemi').innerText = (cemi > 0 ? '-' : '') + cemi.toFixed(2) + ' AZN';
-
-    const qrafikEl = document.getElementById('guncelBorcQrafik');
-    const breakdownEl = document.getElementById('guncelBorcBreakdown');
-    qrafikEl.innerHTML = '';
-    breakdownEl.innerHTML = '';
-
-    const parcalar = [
-      { ad: 'Kredit kartı borcu', tutar: kkBorcu, renk: '#c99a3a' },
-      { ad: 'Deposit Borcu', tutar: depozitBorcu, renk: '#b5533f' },
-      { ad: 'Kredit borcu', tutar: krediBorcuQalan, renk: '#4a6fa5' }
-    ];
-
-    if (cemi > 0) {
-      parcalar.forEach(p => {
-        if (p.tutar > 0) {
-          const yuzde = (p.tutar / cemi) * 100;
-          const parca = document.createElement('div');
-          parca.style.background = p.renk; parca.style.height = '100%'; parca.style.width = yuzde + '%';
-          qrafikEl.appendChild(parca);
-          const row = document.createElement('div');
-          row.className = 'debt-breakdown-row';
-          row.innerHTML = `<span><span class="dot" style="background:${p.renk}"></span>${p.ad}</span><span>-${p.tutar.toFixed(2)} AZN · %${yuzde.toFixed(0)}</span>`;
-          breakdownEl.appendChild(row);
-        }
-      });
-    } else {
-      qrafikEl.innerHTML = '<div style="width:100%; background:rgba(255,255,255,0.12); height:100%;"></div>';
-      breakdownEl.innerHTML = '<div class="breakdown-empty" style="color:#9aa6c2;">Borc yoxdur.</div>';
-    }
+  // Kredit xəttinin (taksitli kredit) hazırkı qalıq borcu — hesablar arası birbaşa
+  // ödənişlər (elaveOdenis) buradan düşülür, amma mənfi olmur.
+  function krediBorcuQalanHesabla() {
+    if (!krediBorcu) return 0;
+    const xam = (krediBorcu.taksitSayi - krediBorcu.odenmisTaksitSayi) * krediBorcu.aylikMebleg;
+    return Math.max(0, xam - (krediBorcu.elaveOdenis || 0));
   }
 
-  // Bir taksitin tarixini hesabla: başlanğıc + i ay
-  function taksitTarixi(baslangicIso, i) {
-    const [y, m, d] = baslangicIso.split('-').map(Number);
-    const dt = new Date(Date.UTC(y, (m - 1) + i, d));
-    const dd = String(dt.getUTCDate()).padStart(2, '0');
-    const mm = String(dt.getUTCMonth() + 1).padStart(2, '0');
-    return dd + '.' + mm;
-  }
-
-  // Kredit borcunun aylıq ödəniş qrafiki (sütun qrafik)
-  function krediBorcuAylikQrafikGoster() {
-    const chartEl = document.getElementById('krediBorcuAylikQrafik');
-    if (!chartEl || !krediBorcu) return;
-    chartEl.innerHTML = '';
-    for (let i = 0; i < krediBorcu.taksitSayi; i++) {
-      const odenilib = i < krediBorcu.odenmisTaksitSayi;
-      const col = document.createElement('div');
-      col.className = 'taksit-bar-col';
-      col.innerHTML = `
-        <span class="taksit-bar-amt${odenilib ? ' paid' : ''}">${odenilib ? '✓' : krediBorcu.aylikMebleg.toFixed(0)}</span>
-        <div class="taksit-bar${odenilib ? ' filled' : ''}"></div>
-        <span class="taksit-bar-month">${taksitTarixi(krediBorcu.baslangic, i)}</span>
-      `;
-      chartEl.appendChild(col);
-    }
-  }
-
+  // Kredit xətt kartı indi "Hesablarım" siyahısında (hesablarGoster() içində) göstərilir —
+  // krediBorcuGoster() sadəcə o siyahını yenidən çəkir.
   function krediBorcuGoster() {
-    guncelBorclarQrafikGoster();
-    if (!krediBorcu) {
-      document.getElementById('krediBorcuMebleg').innerText = '—';
-      document.getElementById('krediBorcuTarixler').innerText = '—';
-      document.getElementById('krediBorcuIrəliləyiş').innerText = '—';
-      document.getElementById('krediBorcuQalan').innerText = '—';
-      document.getElementById('krediBorcuError').innerText = '';
-      document.getElementById('krediBorcuAylikQrafik').innerHTML = '';
-      const bosBtn = document.getElementById('krediBorcuOdeBtn');
-      bosBtn.innerText = 'Bu ayın taksitini ödə (kredit kartından)';
-      bosBtn.disabled = true;
-      return;
-    }
-    document.getElementById('krediBorcuMebleg').innerText = krediBorcu.aylikMebleg.toFixed(2) + ' AZN';
-    document.getElementById('krediBorcuTarixler').innerText = tarixFormat(krediBorcu.baslangic) + ' – ' + tarixFormat(krediBorcu.bitis);
-    document.getElementById('krediBorcuIrəliləyiş').innerText = krediBorcu.odenmisTaksitSayi + '/' + krediBorcu.taksitSayi + ' taksit ödənilib';
-    const qalan = (krediBorcu.taksitSayi - krediBorcu.odenmisTaksitSayi) * krediBorcu.aylikMebleg;
-    document.getElementById('krediBorcuQalan').innerText = 'Qalıq: ' + (qalan > 0 ? '-' : '') + qalan.toFixed(2) + ' AZN';
-    document.getElementById('krediBorcuError').innerText = '';
-
-    krediBorcuAylikQrafikGoster();
-
-    const buAy = cariAyKodu();
-    const odenib = krediBorcu.sonOdenenAy === buAy;
-    const bitib = krediBorcu.odenmisTaksitSayi >= krediBorcu.taksitSayi;
-    const btn = document.getElementById('krediBorcuOdeBtn');
-    if (bitib) {
-      btn.innerText = '🎉 Kredit bağlanıb';
-      btn.disabled = true;
-    } else if (odenib) {
-      btn.innerText = '✓ Bu ayın taksiti ödənilib (ləğv et)';
-      btn.disabled = false;
-    } else {
-      btn.innerText = 'Bu ayın taksitini ödə (kredit kartından)';
-      btn.disabled = false;
-    }
+    hesablarGoster();
   }
 
   function krediBorcuOde() {
@@ -2453,16 +2426,74 @@
     else ekraniGuncelle();
   }
   function dashboardPaneliniAc() {
-    const hesapDeger = typeof anaHesap === 'number' ? anaHesap : 0;
-    const limitDeger = (typeof kreditLimit === 'number') ? kreditLimit : 0;
-    const borcEl = document.getElementById('dashAnaHesapDeger');
-    borcEl.innerText = hesapDeger.toFixed(2) + ' AZN';
-    borcEl.style.color = hesapDeger < 0 ? '#ffb4c2' : '#fff';
-    const balansEl = document.getElementById('dashKrediBalansDeger');
-    balansEl.innerText = (limitDeger + hesapDeger).toFixed(2) + ' AZN';
-    balansEl.classList.toggle('low', (limitDeger + hesapDeger) < 0);
-    document.getElementById('dashKreditLimitDeger').innerText = limitDeger.toFixed(2) + ' AZN';
+    dashboardDairaviDiaqramlariCiz();
     modalAc('dashboardModal');
+  }
+
+  // ---- Dashboard: 3 dairəvi (doughnut) diaqram — Chart.js ilə ----
+  function dairaviCiz(canvasId, mevcudChart, parcalar, legendId, vahid, emptyMesaj) {
+    if (mevcudChart) mevcudChart.destroy();
+    const canvasEl = document.getElementById(canvasId);
+    const legendEl = document.getElementById(legendId);
+    if (!canvasEl || !legendEl) return null;
+    const dolu = parcalar.filter(p => p.tutar > 0);
+    legendEl.innerHTML = '';
+    if (dolu.length === 0) {
+      legendEl.innerHTML = `<div class="pie-empty">${emptyMesaj || 'Məlumat yoxdur.'}</div>`;
+      return new Chart(canvasEl.getContext('2d'), {
+        type: 'doughnut',
+        data: { labels: ['Boş'], datasets: [{ data: [1], backgroundColor: [cssVar('--line') || '#e3e7ee'], borderWidth: 0 }] },
+        options: { cutout: '68%', animation: false, plugins: { legend: { display: false }, tooltip: { enabled: false } } }
+      });
+    }
+    dolu.forEach(p => {
+      const row = document.createElement('div');
+      row.className = 'pie-legend-row';
+      row.innerHTML = `<span class="lbl"><span class="dot" style="background:${p.renk}"></span>${p.ad}</span><span class="amt">${p.tutar.toFixed(0)}${vahid}</span>`;
+      legendEl.appendChild(row);
+    });
+    return new Chart(canvasEl.getContext('2d'), {
+      type: 'doughnut',
+      data: {
+        labels: dolu.map(p => p.ad),
+        datasets: [{ data: dolu.map(p => p.tutar), backgroundColor: dolu.map(p => p.renk), borderWidth: 2, borderColor: cssVar('--panel') || '#fff' }]
+      },
+      options: { cutout: '68%', plugins: { legend: { display: false } } }
+    });
+  }
+
+  function dashboardDairaviDiaqramlariCiz() {
+    if (typeof Chart === 'undefined') return; // Chart.js CDN yüklənməyibsə (internet yoxdursa) səssizcə keç
+
+    // 1. Ümumi borc: Kredit kartı borcu + Deposit borcu + Kredit borcu (xətt)
+    const kkBorcu = (typeof anaHesap === 'number' && anaHesap < 0) ? Math.abs(anaHesap) : 0;
+    const depozitBorcu = (typeof depozitBakiye === 'number' && depozitBakiye < 0) ? Math.abs(depozitBakiye) : 0;
+    const krediBorcuQalan = krediBorcuQalanHesabla();
+    const umumiCemi = kkBorcu + depozitBorcu + krediBorcuQalan;
+    document.getElementById('dashUmumiBorcMerkez').innerText = umumiCemi > 0 ? umumiCemi.toFixed(0) : '0';
+    dashUmumiBorcChart = dairaviCiz('dashUmumiBorcCanvas', dashUmumiBorcChart, [
+      { ad: 'Kredit kartı borcu', tutar: kkBorcu, renk: '#c99a3a' },
+      { ad: 'Deposit borcu', tutar: depozitBorcu, renk: '#b5533f' },
+      { ad: 'Kredit borcu (xətt)', tutar: krediBorcuQalan, renk: '#4a6fa5' }
+    ], 'dashUmumiBorcLegend', ' AZN', 'Borc yoxdur.');
+
+    // 2. Kredit kartı: istifadə olunan / istifadə edilə bilən qalıq
+    const limitDeger = (typeof kreditLimit === 'number') ? kreditLimit : 0;
+    const hesapDeger = typeof anaHesap === 'number' ? anaHesap : 0;
+    const istifade = hesapDeger < 0 ? Math.abs(hesapDeger) : 0;
+    const qalanLimit = Math.max(0, limitDeger + hesapDeger);
+    document.getElementById('dashKrediKartMerkez').innerText = (typeof kreditLimit === 'number') ? limitDeger.toFixed(0) : '—';
+    dashKrediKartChart = dairaviCiz('dashKrediKartCanvas', dashKrediKartChart, (typeof kreditLimit === 'number') ? [
+      { ad: 'İstifadə olunan', tutar: istifade, renk: '#c0435a' },
+      { ad: 'İstifadə edilə bilən', tutar: qalanLimit, renk: '#1f2a44' }
+    ] : [], 'dashKrediKartLegend', ' AZN', 'Kredit kartı hələ əlavə edilməyib.');
+
+    // 3. Kredit borcu (taksitli kredit xətt): ödənilmiş / qalan taksit sayı
+    document.getElementById('dashKrediBorcuMerkez').innerText = krediBorcu ? (krediBorcu.odenmisTaksitSayi + '/' + krediBorcu.taksitSayi) : '—';
+    dashKrediBorcuChart = dairaviCiz('dashKrediBorcuCanvas', dashKrediBorcuChart, krediBorcu ? [
+      { ad: 'Ödənilib', tutar: krediBorcu.odenmisTaksitSayi, renk: '#2b7a56' },
+      { ad: 'Qalıb', tutar: krediBorcu.taksitSayi - krediBorcu.odenmisTaksitSayi, renk: '#c7cfe0' }
+    ] : [], 'dashKrediBorcuLegend', ' taksit', 'Kredit xətt hələ əlavə edilməyib.');
   }
 
   // ==== Ayarlar: Günlük limit + Kateqoriyalar + Son əməliyyatlar + İşıq rejimi ====
@@ -2702,6 +2733,7 @@
     if (tip === 'debit') return 'Debit bank Hesabım';
     if (tip === 'depozit') return 'Bank Deposit Hesabım';
     if (tip === 'kredit') return 'Kredi kartı Hesabım';
+    if (tip === 'krediXett') return 'Kredit xətt';
     return tip;
   }
   function hesabIkonu(tip) {
@@ -2709,7 +2741,45 @@
     if (tip === 'debit') return '🏦';
     if (tip === 'depozit') return '🏛️';
     if (tip === 'kredit') return '💳';
+    if (tip === 'krediXett') return '🧾';
     return '💰';
+  }
+
+  // ---- "+" ilə hesab əlavə etmə: 5 seçim ----
+  const HESAB_SEC_SIYAHI = [
+    { tip: 'nagd', ikon: '💵', ad: 'Cash Hesab', izah: 'Yalnız məbləğ (yalnız +)' },
+    { tip: 'debit', ikon: '🏦', ad: 'Debit Card Hesab', izah: 'Yalnız məbləğ (yalnız +)' },
+    { tip: 'depozit', ikon: '🏛️', ad: 'Deposit Hesabım', izah: 'Yalnız məbləğ (+ və ya -)' },
+    { tip: 'kredit', ikon: '💳', ad: 'Kredit Kart Hesab', izah: 'Limit + istifadə edilə bilən qalıq (- və ya 0)' },
+    { tip: 'krediXett', ikon: '🧾', ad: 'Kredit xətt', izah: 'Ay sayı, başlanğıc tarixi, ödənilməli məbləğ (yalnız -)' }
+  ];
+
+  function hesabSecModalAc() {
+    const konteyner = document.getElementById('hesabSecListesi');
+    konteyner.innerHTML = '';
+    HESAB_SEC_SIYAHI.forEach(h => {
+      const eklenib = (h.tip === 'kredit') ? (typeof kreditLimit === 'number')
+        : (h.tip === 'krediXett') ? !!krediBorcu
+        : !!hesabEklenib[h.tip];
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'hesab-sec-item';
+      btn.onclick = () => hesabSecEt(h.tip);
+      btn.innerHTML = `<span class="ic">${h.ikon}</span><span style="flex:1;">${h.ad}${eklenib ? ' ✓' : ''}<small>${eklenib ? 'Artıq əlavə edilib — düzəltmək üçün seç' : h.izah}</small></span>`;
+      konteyner.appendChild(btn);
+    });
+    modalAc('hesabSecModal');
+  }
+
+  function hesabSecEt(tip) {
+    modalKapat('hesabSecModal');
+    if (tip === 'nagd' || tip === 'debit' || tip === 'depozit') {
+      hesabDuzeltModalAc(tip);
+    } else if (tip === 'kredit') {
+      balanceModalAc();
+    } else if (tip === 'krediXett') {
+      krediBorcuDuzeltModalAc();
+    }
   }
 
   function hesablarPaneliniAc() {
@@ -2728,28 +2798,40 @@
     const limit = (typeof kreditLimit === 'number') ? kreditLimit : 0;
     const borc = (typeof anaHesap === 'number') ? anaHesap : 0;
     const muvcud = limit + borc; // istifadə edilə bilən limit
-    konteyner.innerHTML = `
+
+    let html = '';
+    if (hesabEklenib.nagd) {
+      html += `
       <div class="modal-item">
         <div class="field-row between">
           <div class="field-row"><span style="font-size:18px;">💵</span><b>Cash Hesab</b></div>
           <button class="btn btn-ghost" onclick="hesabDuzeltModalAc('nagd')" style="padding:5px 10px;">Düzəlt</button>
         </div>
         <div style="font-size:19px; font-weight:700; color:var(--navy);">${nagdBakiye.toFixed(2)} AZN</div>
-      </div>
+      </div>`;
+    }
+    if (hesabEklenib.debit) {
+      html += `
       <div class="modal-item">
         <div class="field-row between">
           <div class="field-row"><span style="font-size:18px;">🏦</span><b>Debit bank Hesabım</b></div>
           <button class="btn btn-ghost" onclick="hesabDuzeltModalAc('debit')" style="padding:5px 10px;">Düzəlt</button>
         </div>
         <div style="font-size:19px; font-weight:700; color:var(--navy);">${debitBakiye.toFixed(2)} AZN</div>
-      </div>
+      </div>`;
+    }
+    if (hesabEklenib.depozit) {
+      html += `
       <div class="modal-item">
         <div class="field-row between">
           <div class="field-row"><span style="font-size:18px;">🏛️</span><b>Bank Deposit Hesabım</b></div>
           <button class="btn btn-ghost" onclick="hesabDuzeltModalAc('depozit')" style="padding:5px 10px;">Düzəlt</button>
         </div>
         <div style="font-size:19px; font-weight:700; color:${depozitBakiye < 0 ? 'var(--danger)' : 'var(--navy)'};">${depozitBakiye.toFixed(2)} AZN</div>
-      </div>
+      </div>`;
+    }
+    if (typeof kreditLimit === 'number') {
+      html += `
       <div class="modal-item">
         <div class="field-row between">
           <div class="field-row"><span style="font-size:18px;">💳</span><b>Kredi kartı Hesabım</b></div>
@@ -2757,8 +2839,34 @@
         </div>
         <div style="font-size:19px; font-weight:700; color:${borc < 0 ? 'var(--danger)' : 'var(--navy)'};">${borc.toFixed(2)} AZN</div>
         <div style="font-size:12px; color:var(--muted);">Limit: ${limit.toFixed(2)} AZN · İstifadə edilə bilən: ${muvcud.toFixed(2)} AZN</div>
-      </div>
-    `;
+      </div>`;
+    }
+    if (krediBorcu) {
+      const qalan = krediBorcuQalanHesabla();
+      const buAy = cariAyKodu();
+      const odenib = krediBorcu.sonOdenenAy === buAy;
+      const bitib = krediBorcu.odenmisTaksitSayi >= krediBorcu.taksitSayi;
+      let btnText = 'Bu ayın taksitini ödə (kredit kartından)';
+      let btnDisabled = false;
+      if (bitib) { btnText = '🎉 Kredit bağlanıb'; btnDisabled = true; }
+      else if (odenib) { btnText = '✓ Bu ayın taksiti ödənilib (ləğv et)'; }
+      const elaveText = (krediBorcu.elaveOdenis > 0) ? ` · əlavə ödəniş: -${krediBorcu.elaveOdenis.toFixed(2)} AZN` : '';
+      html += `
+      <div class="modal-item">
+        <div class="field-row between">
+          <div class="field-row"><span style="font-size:18px;">🧾</span><b>Kredit xətt</b></div>
+          <button class="btn btn-ghost" onclick="krediBorcuDuzeltModalAc()" style="padding:5px 10px;">Düzəlt</button>
+        </div>
+        <div style="font-size:19px; font-weight:700; color:${qalan > 0 ? 'var(--danger)' : 'var(--navy)'};">${qalan > 0 ? '-' : ''}${qalan.toFixed(2)} AZN</div>
+        <div style="font-size:12px; color:var(--muted); margin-bottom:8px;">${krediBorcu.odenmisTaksitSayi}/${krediBorcu.taksitSayi} taksit ödənilib · Aylıq: ${krediBorcu.aylikMebleg.toFixed(2)} AZN · ${tarixFormat(krediBorcu.baslangic)}–${tarixFormat(krediBorcu.bitis)}${elaveText}</div>
+        <button class="btn btn-primary" ${btnDisabled ? 'disabled' : ''} onclick="krediBorcuOde()" style="width:100%;">${btnText}</button>
+        <div class="error-text" id="krediBorcuError"></div>
+      </div>`;
+    }
+    if (!html) {
+      html = '<p class="empty-note" style="padding:8px 0;">Hələ heç bir hesab əlavə edilməyib. Yuxarıdakı ➕ düyməsindən başla.</p>';
+    }
+    konteyner.innerHTML = html;
     hesabTransferTarixceGoster();
   }
 
@@ -2797,13 +2905,18 @@
   function hesabDuzeltOnayla() {
     const val = document.getElementById('hesabDuzeltInput').value;
     const p = parseFloat(val.replace(',', '.'));
+    const errEl = document.getElementById('hesabDuzeltError');
     if (isNaN(p)) {
-      document.getElementById('hesabDuzeltError').innerText = 'Düzgün rəqəm yaz.';
+      errEl.innerText = 'Düzgün rəqəm yaz.';
       return;
     }
-    if (hesabDuzeltTipi === 'nagd') nagdBakiye = p;
-    else if (hesabDuzeltTipi === 'debit') debitBakiye = p;
-    else if (hesabDuzeltTipi === 'depozit') depozitBakiye = p;
+    if ((hesabDuzeltTipi === 'nagd' || hesabDuzeltTipi === 'debit') && p < 0) {
+      errEl.innerText = hesabAdi(hesabDuzeltTipi) + ' üçün məbləğ yalnız müsbət (+) ola bilər.';
+      return;
+    }
+    if (hesabDuzeltTipi === 'nagd') { nagdBakiye = p; hesabEklenib.nagd = true; }
+    else if (hesabDuzeltTipi === 'debit') { debitBakiye = p; hesabEklenib.debit = true; }
+    else if (hesabDuzeltTipi === 'depozit') { depozitBakiye = p; hesabEklenib.depozit = true; }
     veriKaydet();
     modalKapat('hesabDuzeltModal');
     hesablarGoster();
@@ -2847,6 +2960,10 @@
       errEl.innerText = 'Düzgün məbləğ yaz.';
       return;
     }
+    if (hedefTip === 'krediXett' && !krediBorcu) {
+      errEl.innerText = 'Əvvəlcə "Kredit xətt" hesabını ➕ ilə əlavə et.';
+      return;
+    }
     if (menbeTip !== 'kredit') {
       const mevcud = hesabBakiyesiOxu(menbeTip);
       if (tutar > mevcud) {
@@ -2864,7 +2981,13 @@
     }
 
     hesabBakiyesiDeyis(menbeTip, -tutar);
-    hesabBakiyesiDeyis(hedefTip, tutar);
+    if (hedefTip === 'krediXett') {
+      // Kredit xəttinə birbaşa ödəniş: mənbədən məbləğ çıxılır, xəttin qalıq borcundan
+      // eyni məbləğ düşülür (əlavə ödəniş kimi izlənilir — taksit sayı dəyişmir, qalıq stabil görünür).
+      krediBorcu.elaveOdenis = (krediBorcu.elaveOdenis || 0) + tutar;
+    } else {
+      hesabBakiyesiDeyis(hedefTip, tutar);
+    }
 
     const simdi = new Date();
     hesabTransferleri.unshift({
@@ -2875,6 +2998,7 @@
     veriKaydet();
     modalKapat('transferModal');
     hesablarGoster();
+    krediBorcuGoster();
     ekraniGuncelle();
   }
 
@@ -2882,10 +3006,15 @@
     const t = hesabTransferleri[index];
     confirmAc('Transferi ləğv et', hesabAdi(t.menbeTip) + ' → ' + hesabAdi(t.hedefTip) + ' (' + t.tutar.toFixed(2) + ' AZN) geri qaytarılsın?', () => {
       hesabBakiyesiDeyis(t.menbeTip, t.tutar);
-      hesabBakiyesiDeyis(t.hedefTip, -t.tutar);
+      if (t.hedefTip === 'krediXett') {
+        if (krediBorcu) krediBorcu.elaveOdenis = Math.max(0, (krediBorcu.elaveOdenis || 0) - t.tutar);
+      } else {
+        hesabBakiyesiDeyis(t.hedefTip, -t.tutar);
+      }
       hesabTransferleri.splice(index, 1);
       veriKaydet();
       hesablarGoster();
+      krediBorcuGoster();
       ekraniGuncelle();
     });
   }
