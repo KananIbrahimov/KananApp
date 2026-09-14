@@ -79,7 +79,7 @@
     font-family: "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
     background: var(--bg);
     margin: 0;
-    padding: 20px 14px 60px;
+    padding: 20px 14px calc(86px + env(safe-area-inset-bottom, 0px));
     display: flex;
     flex-direction: column;
     align-items: center;
@@ -105,44 +105,38 @@
   }
   .gear-btn:hover { border-color: var(--navy-soft); }
 
-  .hamburger-btn {
-    background: var(--panel); border: 1px solid var(--line); width: 38px; height: 38px;
-    border-radius: 10px; display: flex; align-items: center; justify-content: center;
-    cursor: pointer; font-size: 17px; color: var(--navy);
+  /* ==== Alt naviqasiya paneli (bottom tab bar) ==== */
+  .bottom-nav {
+    position: fixed; left: 0; right: 0; bottom: 0; z-index: 100;
+    display: flex; justify-content: center; background: var(--panel);
+    border-top: 1px solid var(--line); box-shadow: 0 -3px 14px var(--shadow);
   }
-  .hamburger-btn:hover { border-color: var(--navy-soft); }
+  .bottom-nav-inner {
+    display: flex; width: 100%; max-width: 430px; margin: 0 auto;
+    padding: 6px 4px calc(6px + env(safe-area-inset-bottom, 0px));
+  }
+  .nav-item {
+    flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center;
+    gap: 2px; background: none; border: none; cursor: pointer; padding: 6px 2px 5px;
+    color: var(--muted); font-size: 10.5px; font-weight: 600; border-radius: 12px;
+    transition: color .15s, background .15s;
+  }
+  .nav-item:active { background: var(--panel-alt); }
+  .nav-item .nav-icon { font-size: 20px; line-height: 1; transition: transform .15s; }
+  .nav-item.active { color: var(--navy); }
+  .nav-item.active .nav-icon { transform: translateY(-1px); }
+  [data-theme="dark"] .nav-item.active { color: var(--gold); }
 
-  .side-menu-overlay {
-    position: fixed; inset: 0; background: var(--overlay); display: none; z-index: 90;
-  }
-  .side-menu-overlay.active { display: block; }
-  .side-menu {
-    position: fixed; top: 0; left: 0; height: 100%; width: 250px; background: var(--panel);
-    box-shadow: 4px 0 20px var(--shadow); transform: translateX(-100%);
-    transition: transform .25s ease, background .2s; z-index: 95; padding: 22px 16px; display: flex;
-    flex-direction: column; gap: 4px; box-sizing: border-box;
-  }
-  .side-menu.active { transform: translateX(0); }
-  .side-menu .menu-title {
-    font-family: Georgia, "Times New Roman", serif; font-size: 18px; font-weight: 700;
-    color: var(--navy); margin: 4px 4px 14px;
-  }
+  /* ==== Dashboard tab (kredit kartı güncel borcu) ==== */
   .menu-balance-card {
-    background: var(--gold-soft); border: 1px solid var(--gold-line); border-radius: var(--radius-md);
-    padding: 12px 14px; margin: 0 2px 16px;
+    background: var(--gold-soft); border: 1px solid var(--gold-line); border-radius: var(--radius-lg);
+    padding: 16px 18px; margin: 0 0 16px;
   }
-  .menu-balance-card .k { font-size: 11px; color: var(--gold-ink); font-weight: 600; }
-  .menu-balance-card .v { font-size: 19px; font-weight: 700; color: var(--gold-ink-dark); margin-top: 2px; }
+  .menu-balance-card .k { font-size: 12px; color: var(--gold-ink); font-weight: 600; }
+  .menu-balance-card .v { font-size: 26px; font-weight: 700; color: var(--gold-ink-dark); margin-top: 3px; }
   .menu-balance-card .v.low { color: var(--danger); }
-  .menu-balance-card .v2 { font-size: 12.5px; font-weight: 600; color: var(--gold-ink); margin-top: 6px; padding-top: 6px; border-top: 1px solid var(--gold-line); }
+  .menu-balance-card .v2 { font-size: 12.5px; font-weight: 600; color: var(--gold-ink); margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--gold-line); }
   .menu-balance-card .v2 b { color: var(--gold-ink-dark); font-weight: 700; }
-  .side-menu .menu-item {
-    display: flex; align-items: center; gap: 10px; padding: 11px 12px; border-radius: 10px;
-    border: none; background: transparent; font-size: 14px; font-weight: 600; color: var(--ink);
-    cursor: pointer; text-align: left; width: 100%;
-  }
-  .side-menu .menu-item:hover { background: var(--panel-alt); }
-  .side-menu .menu-item.active { background: var(--navy); color: #fff; }
 
   .tabs {
     display: flex; background: var(--panel); border: 1px solid var(--line);
@@ -344,7 +338,7 @@
   @keyframes pageSlideIn { from { opacity: 0; transform: translateX(16px); } to { opacity: 1; transform: translateX(0); } }
   .page-inner {
     width: 100%; max-width: 430px; margin: 0 auto; box-sizing: border-box;
-    padding: 20px 14px 40px; flex: 1; display: flex; flex-direction: column; min-height: 100%;
+    padding: 20px 14px calc(86px + env(safe-area-inset-bottom, 0px)); flex: 1; display: flex; flex-direction: column; min-height: 100%;
   }
   .page-inner .modal-list { max-height: none; }
   /* Long pages (like Hesablar və Borclar) have more content than fits one screen.
@@ -491,23 +485,46 @@
   <div class="loading-screen" id="loadingScreen">Yüklənir...</div>
 </div>
 
-<div class="side-menu-overlay" id="sideMenuOverlay" onclick="menuKapat()"></div>
-<div class="side-menu" id="sideMenu">
-  <div class="menu-title">Günlük Xərclər</div>
-  <div class="menu-balance-card" onclick="menuKapat(); hesablarPaneliniAc();" style="cursor:pointer;">
-    <div class="k">Kredit kartımın güncel borcu</div>
-    <div class="v" id="menuAnaHesapDeger">0.00 AZN</div>
-    <div class="v2">Kredi kartı balansı (istifadə edilə bilən): <b id="menuKrediBalansDeger">0.00 AZN</b></div>
-  </div>
-  <button class="menu-item active" id="menuAnaSehife" onclick="menuAnaSehifeSec()">🏠 Ana səhifə</button>
-  <button class="menu-item" id="menuAylikHesabat" onclick="menuAylikHesabatSec()">📈 Aylıq xülasə</button>
-  <button class="menu-item" id="menuHesablar" onclick="menuHesablarSec()">💰 Hesablar və Borclar</button>
-  <button class="menu-item" id="menuAyarlar" onclick="menuAyarlarSec()">⚙️ Ayarlar</button>
-  <div style="flex:1;"></div>
-  <div style="text-align:center; font-size:11px; color:var(--muted); padding:10px 0 4px; border-top:1px solid var(--line); margin-top:6px;">
-    Powered by Kanan Ibrahimov
+<!-- Dashboard tab: kredit kartının güncəl borcu -->
+<div id="dashboardModal" class="page-screen">
+  <div class="page-inner">
+    <div style="padding-bottom:12px; margin-bottom:4px;">
+      <h2 style="margin:0;">Dashboard</h2>
+    </div>
+    <div class="debt-summary-card">
+      <div class="debt-summary-label">Kredit kartımın güncəl borcu</div>
+      <div class="debt-summary-amount" id="dashAnaHesapDeger">—</div>
+    </div>
+    <div class="menu-balance-card">
+      <div class="k">Kredit kartı balansı (istifadə edilə bilən)</div>
+      <div class="v" id="dashKrediBalansDeger">—</div>
+      <div class="v2">Kredit limiti: <b id="dashKreditLimitDeger">—</b></div>
+    </div>
+    <button class="btn btn-primary" onclick="balanceModalAc()" style="width:100%; margin-bottom:10px;">Kredit kartını düzəlt</button>
+    <button class="btn btn-ghost" style="width:100%; border:1px solid var(--line);" onclick="sekmeSec('hesablar')">💰 Hesablar və Borclara bax</button>
   </div>
 </div>
+
+<!-- Alt naviqasiya (bottom tab bar) -->
+<nav class="bottom-nav" id="bottomNav">
+  <div class="bottom-nav-inner">
+    <button class="nav-item" id="navDashboard" onclick="sekmeSec('dashboard')">
+      <span class="nav-icon">📊</span><span>Dashboard</span>
+    </button>
+    <button class="nav-item" id="navAylikHesabat" onclick="sekmeSec('aylikHesabat')">
+      <span class="nav-icon">📈</span><span>Aylıq</span>
+    </button>
+    <button class="nav-item active" id="navAna" onclick="sekmeSec('ana')">
+      <span class="nav-icon">🧾</span><span>Xərclər</span>
+    </button>
+    <button class="nav-item" id="navHesablar" onclick="sekmeSec('hesablar')">
+      <span class="nav-icon">💰</span><span>Hesablar</span>
+    </button>
+    <button class="nav-item" id="navAyarlar" onclick="sekmeSec('ayarlar')">
+      <span class="nav-icon">⚙️</span><span>Ayarlar</span>
+    </button>
+  </div>
+</nav>
 
 <!-- Amount entry modal -->
 <div id="amountModal" class="modal">
@@ -733,7 +750,7 @@
     </div>
     <div class="hesabat-cemi-card">
       <div class="k">Bu ay xərclədiyin</div>
-      <div class="v" id="aylikHesabatCemi">0.00 AZN</div>
+      <div class="v" id="aylikHesabatCemi">—</div>
     </div>
     <div style="background:var(--panel); border:1px solid var(--line); border-radius:var(--radius-lg); padding:14px; margin-bottom:16px;">
       <canvas id="aylikPastaCanvas" height="200"></canvas>
@@ -802,7 +819,7 @@
     <!-- Combined debts chart: Kredi kartı borcu + Deposit Borcu + Kredit borcu -->
     <div class="debt-summary-card">
       <div class="debt-summary-label">Ümumi borc</div>
-      <div class="debt-summary-amount" id="guncelBorcCemi">0.00 AZN</div>
+      <div class="debt-summary-amount" id="guncelBorcCemi">—</div>
       <div class="debt-chart-container" id="guncelBorcQrafik"></div>
       <div class="debt-breakdown" id="guncelBorcBreakdown"></div>
     </div>
@@ -813,13 +830,13 @@
     <div class="ay-total-row" style="margin-bottom:12px;">
       <span>Aylıq taksit</span>
       <span style="display:flex; align-items:center; gap:8px;">
-        <span id="krediBorcuMebleg">0.00 AZN</span>
+        <span id="krediBorcuMebleg">—</span>
         <button class="btn btn-ghost" onclick="krediBorcuDuzeltModalAc()" style="padding:5px 10px; font-size:12px;">Düzəlt</button>
       </span>
     </div>
     <div style="display:flex; justify-content:space-between; font-size:12.5px; color:var(--muted); margin-bottom:8px;">
-      <span id="krediBorcuIrəliləyiş">0/0 taksit ödənilib</span>
-      <span id="krediBorcuQalan">Qalıq: 0.00 AZN</span>
+      <span id="krediBorcuIrəliləyiş">—</span>
+      <span id="krediBorcuQalan">—</span>
     </div>
     <div id="krediBorcuAylikQrafik" class="taksit-chart"></div>
     <div class="error-text" id="krediBorcuError"></div>
@@ -1185,7 +1202,7 @@
     debitBakiye = (typeof parsed.debitBakiye === 'number') ? parsed.debitBakiye : 0;
     depozitBakiye = (typeof parsed.depozitBakiye === 'number') ? parsed.depozitBakiye : 0;
     hesabTransferleri = parsed.hesabTransferleri || [];
-    gunlukLimit = (typeof parsed.gunlukLimit === 'number') ? parsed.gunlukLimit : 20;
+    gunlukLimit = (typeof parsed.gunlukLimit === 'number') ? parsed.gunlukLimit : null;
     sonDeyisiklikVaxti = parsed.backupTarixi || new Date().toISOString();
     try {
       localStorage.setItem(STORAGE_KEY, JSON.stringify({ kategoriler, giderler, anaHesap, kreditLimit, krediBorcu, nagdBakiye, debitBakiye, depozitBakiye, hesabTransferleri, gunlukLimit, sonDeyisiklikVaxti }));
@@ -1344,21 +1361,28 @@
   }
 
   function firebaseBaslat() {
-    if (typeof firebase === 'undefined') return; // internet yoxdursa SDK yüklənməyib, səssizcə keç
-    try {
-      firebase.initializeApp(firebaseConfig);
-      firestoreDb = firebase.firestore();
-      firebase.auth().signInAnonymously().then(() => {
-        firebaseHazir = true;
-        if (senkronKey) firebaseDinlemeyeBasla();
-        firebasePanelGuncelle();
-      }).catch((e) => {
-        console.warn('Firebase giriş xətası:', e);
-        firebasePanelGuncelle('Bağlantı alınmadı.', true);
-      });
-    } catch (e) {
-      console.warn('Firebase başlatma xətası:', e);
-    }
+    // Verini indi bu funksiyanın Promise-i ilə (əvvəlcədən) gözləyirik, ona görə
+    // "istifadəçi görməyəcək" gizli sorğu deyil — tətbiqin AÇILIŞ məlumatı bundan asılıdır.
+    return new Promise((resolve) => {
+      if (typeof firebase === 'undefined') { resolve(false); return; } // internet yoxdursa SDK yüklənməyib
+      try {
+        firebase.initializeApp(firebaseConfig);
+        firestoreDb = firebase.firestore();
+        firebase.auth().signInAnonymously().then(() => {
+          firebaseHazir = true;
+          if (senkronKey) firebaseDinlemeyeBasla(); // yavaş şəbəkədə vaxt aşımından sonra da gec-tez qoşulsun
+          firebasePanelGuncelle();
+          resolve(true);
+        }).catch((e) => {
+          console.warn('Firebase giriş xətası:', e);
+          firebasePanelGuncelle('Bağlantı alınmadı.', true);
+          resolve(false);
+        });
+      } catch (e) {
+        console.warn('Firebase başlatma xətası:', e);
+        resolve(false);
+      }
+    });
   }
 
   function firebasePanelGuncelle(mesaj, xetaMi) {
@@ -1502,7 +1526,7 @@
   let debitBakiye = 0; // Debit bank Hesabım
   let depozitBakiye = 0; // Bank Deposit Hesabım
   let hesabTransferleri = []; // hesablar arası transfer tarixçəsi
-  let gunlukLimit = 20; // gündəlik xərc limiti — "Ayarlar" bölməsindən dəyişdirilir
+  let gunlukLimit = null; // gündəlik xərc limiti — istifadəçi "Ayarlar" bölməsindən özü təyin edir, invented default yoxdur
   let veriYuklendi = false;
   let aylikPastaChart = null; // Chart.js: kateqoriya dağılımı (pasta)
   let aylikTrendChart = null; // Chart.js: günlük xərc trendi (xətt)
@@ -1544,7 +1568,9 @@
     };
   }
 
-  async function veriYukle() {
+  // Yerli keşdən (və ya heç nə yoxdursa defolt boş vəziyyətdən) yükləmə — YALNIZ
+  // Firebase əlçatan olmayanda (offline və ya SDK bloklanıbsa) ehtiyat variant kimi işlədilir.
+  function yerliVeriniYukle() {
     try {
       const raw = localStorage.getItem(STORAGE_KEY);
       if (raw) {
@@ -1558,7 +1584,7 @@
         debitBakiye = (typeof parsed.debitBakiye === 'number') ? parsed.debitBakiye : 0;
         depozitBakiye = (typeof parsed.depozitBakiye === 'number') ? parsed.depozitBakiye : 0;
         hesabTransferleri = parsed.hesabTransferleri || [];
-        gunlukLimit = (typeof parsed.gunlukLimit === 'number') ? parsed.gunlukLimit : 20;
+        gunlukLimit = (typeof parsed.gunlukLimit === 'number') ? parsed.gunlukLimit : null;
         sonDeyisiklikVaxti = parsed.sonDeyisiklikVaxti || null;
       } else {
         kategoriler = varsayilanKategoriler;
@@ -1570,7 +1596,7 @@
         debitBakiye = 0;
         depozitBakiye = 0;
         hesabTransferleri = [];
-        gunlukLimit = 20;
+        gunlukLimit = null;
         sonDeyisiklikVaxti = null;
       }
     } catch (e) {
@@ -1583,12 +1609,56 @@
       debitBakiye = 0;
       depozitBakiye = 0;
       hesabTransferleri = [];
-      gunlukLimit = 20;
+      gunlukLimit = null;
     }
+  }
+
+  // Vaxt aşımı ilə bir promise-i "yarışdırır" — Firebase həddindən artıq uzun
+  // çəkərsə (məs. şəbəkə problemi), tətbiq əbədi "Yüklənir..." ekranında qalmasın.
+  function vaxtAsimiIle(promise, ms) {
+    return Promise.race([
+      promise,
+      new Promise((resolve) => setTimeout(() => resolve(false), ms))
+    ]);
+  }
+
+  // ==== Məlumat mənbəyi: Firebase (Firestore) ====
+  // Tətbiq açılanda əvvəlcə Firebase-ə qoşulmağa çalışır və məlumatı ORADAN oxuyur.
+  // Sync Key yoxdursa (ilk açılış), avtomatik yaradılır — istifadəçi əl ilə heç nə
+  // etmədən tətbiq avtomatik olaraq öz Firebase hesabına bağlanır. Firebase əlçatan
+  // deyilsə (offline və ya SDK bloklanıb), yerli keşə keçilir ki, tətbiq işləməyə davam etsin.
+  async function veriYukle() {
+    let firebaseDenGeldi = false;
+    try {
+      const hazir = await vaxtAsimiIle(firebaseBaslat(), 8000);
+      if (hazir && firestoreDb) {
+        if (!senkronKey) {
+          senkronKey = uzunRastgeleKod(32);
+          localStorage.setItem('firebase_sync_key', senkronKey);
+        }
+        const snap = await firestoreDb.collection('syncs').doc(senkronKey).get();
+        if (snap.exists && snap.data() && snap.data().data) {
+          driveVerisiniTetbiqEt(snap.data().data);
+          firebaseDenGeldi = true;
+        }
+      }
+    } catch (e) {
+      console.warn('Firebase-dən oxuma xətası, yerli keşə keçilir:', e);
+    }
+
+    if (!firebaseDenGeldi) {
+      yerliVeriniYukle();
+      // İlk açılış (Firestore-da hələ sənəd yoxdur) — mövcud yerli vəziyyəti dərhal
+      // Firebase-ə köçürürük ki, bundan sonrakı hər açılış Firebase-dən oxusun.
+      if (firebaseHazir && senkronKey) firebaseYazEt();
+    }
+
     veriYuklendi = true;
     appIskeletiOlustur();
     ekraniGuncelle();
     driveMenyuGuncelle();
+    firebasePanelGuncelle();
+    if (firebaseHazir && senkronKey) firebaseDinlemeyeBasla();
   }
 
   async function veriKaydet() {
@@ -1634,7 +1704,7 @@
           debitBakiye = (typeof parsed.debitBakiye === 'number') ? parsed.debitBakiye : 0;
           depozitBakiye = (typeof parsed.depozitBakiye === 'number') ? parsed.depozitBakiye : 0;
           hesabTransferleri = parsed.hesabTransferleri || [];
-          gunlukLimit = (typeof parsed.gunlukLimit === 'number') ? parsed.gunlukLimit : 20;
+          gunlukLimit = (typeof parsed.gunlukLimit === 'number') ? parsed.gunlukLimit : null;
           veriKaydet();
           ekraniGuncelle();
           menuKapat();
@@ -1649,10 +1719,8 @@
 
   function appIskeletiOlustur() {
     document.getElementById('app').innerHTML = `
-      <div class="top">
-        <button class="hamburger-btn" onclick="menuAc()">☰</button>
+      <div class="top" style="justify-content:center;">
         <h1>Günlük Xərclər</h1>
-        <span style="width:38px;"></span>
       </div>
       <div class="date-nav">
         <button class="date-nav-arrow" id="tarixGeriBtn" onclick="tarixDeyis(-1)">‹</button>
@@ -1661,26 +1729,26 @@
       </div>
       <div class="summary-card">
         <div class="summary-label" id="donemBaslik">Bugünkü ümumi xərc</div>
-        <div class="summary-amount" id="toplamTutar">0.00 AZN</div>
+        <div class="summary-amount" id="toplamTutar">—</div>
         <div class="summary-sub" id="donemAlt"></div>
         <div id="progressCubuk" class="progress-bar-container"></div>
         <div id="breakdown" class="breakdown"></div>
       </div>
       <div class="daily-limit-card" id="gunlukLimitKart">
         <div class="daily-limit-head">
-          <span class="lbl" id="gunlukLimitLbl">Günlük limit: 20.00 AZN</span>
-          <span class="pct" id="gunlukLimitYuzde">%0</span>
+          <span class="lbl" id="gunlukLimitLbl">Günlük limit</span>
+          <span class="pct" id="gunlukLimitYuzde">—</span>
         </div>
         <div class="daily-limit-bar-bg"><div class="daily-limit-bar-fill" id="gunlukLimitBar" style="width:0%"></div></div>
         <div class="daily-limit-foot">
-          <span>Xərclənib: <b id="gunlukLimitXerc">0.00 AZN</b></span>
-          <span class="qalan" id="gunlukLimitQalan">Qalıq: 20.00 AZN</span>
+          <span>Xərclənib: <b id="gunlukLimitXerc">—</b></span>
+          <span class="qalan" id="gunlukLimitQalan">—</span>
         </div>
       </div>
       <div class="insight-strip">
         <div class="insight-box">
           <div class="k">Günlük ortalama</div>
-          <div class="v" id="insightOrtalama">0.00 AZN</div>
+          <div class="v" id="insightOrtalama">—</div>
         </div>
         <div class="insight-box">
           <div class="k">Ən çox xərc</div>
@@ -1728,30 +1796,33 @@
   }
 
   function gunlukLimitGuncelle(bugunkuToplam) {
-    const limit = (typeof gunlukLimit === 'number' && gunlukLimit > 0) ? gunlukLimit : 0;
-    const yuzde = limit > 0 ? (bugunkuToplam / limit) * 100 : 0;
-    const asilib = bugunkuToplam > limit;
+    const limitTeyinEdilib = (typeof gunlukLimit === 'number' && gunlukLimit > 0);
+    const limit = limitTeyinEdilib ? gunlukLimit : 0;
+    const yuzde = limitTeyinEdilib ? (bugunkuToplam / limit) * 100 : 0;
+    const asilib = limitTeyinEdilib && bugunkuToplam > limit;
     const qalan = limit - bugunkuToplam;
 
     const lblEl = document.getElementById('gunlukLimitLbl');
-    lblEl.innerText = 'Günlük limit: ' + limit.toFixed(2) + ' AZN';
+    lblEl.innerText = limitTeyinEdilib ? ('Günlük limit: ' + limit.toFixed(2) + ' AZN') : 'Günlük limit təyin edilməyib';
     lblEl.classList.toggle('over', asilib);
 
     const pctEl = document.getElementById('gunlukLimitYuzde');
-    pctEl.innerText = '%' + yuzde.toFixed(0);
+    pctEl.innerText = limitTeyinEdilib ? ('%' + yuzde.toFixed(0)) : '—';
     pctEl.classList.toggle('over', asilib);
 
     document.getElementById('gunlukLimitXerc').innerText = bugunkuToplam.toFixed(2) + ' AZN';
 
     const barEl = document.getElementById('gunlukLimitBar');
-    barEl.style.width = Math.min(yuzde, 100) + '%';
+    barEl.style.width = (limitTeyinEdilib ? Math.min(yuzde, 100) : 0) + '%';
     barEl.classList.toggle('over', asilib);
 
     const qalanEl = document.getElementById('gunlukLimitQalan');
     qalanEl.classList.toggle('over', asilib);
-    qalanEl.innerText = asilib
-      ? ('Limit aşıldı: +' + Math.abs(qalan).toFixed(2) + ' AZN')
-      : ('Qalıq: ' + qalan.toFixed(2) + ' AZN');
+    qalanEl.innerText = !limitTeyinEdilib
+      ? '—'
+      : (asilib
+        ? ('Limit aşıldı: +' + Math.abs(qalan).toFixed(2) + ' AZN')
+        : ('Qalıq: ' + qalan.toFixed(2) + ' AZN'));
 
     document.getElementById('gunlukLimitKart').classList.toggle('over', asilib);
   }
@@ -1818,18 +1889,6 @@
       .filter(g => !g.aylikRef && new Date(g.tamTarix).toDateString() === goruntulenenTarix.toDateString())
       .reduce((acc, g) => acc + g.tutar, 0);
     gunlukLimitGuncelle(bugunkuToplam);
-
-    const hesapDeger = typeof anaHesap === 'number' ? anaHesap : 0;
-    const menuHesapEl = document.getElementById('menuAnaHesapDeger');
-    if (menuHesapEl) {
-      menuHesapEl.innerText = hesapDeger.toFixed(2) + ' AZN';
-      menuHesapEl.classList.toggle('low', hesapDeger < 0);
-    }
-    const menuBalansEl = document.getElementById('menuKrediBalansDeger');
-    if (menuBalansEl) {
-      const limitDeger = (typeof kreditLimit === 'number') ? kreditLimit : 0;
-      menuBalansEl.innerText = (limitDeger + hesapDeger).toFixed(2) + ' AZN';
-    }
 
     const butonlarEl = document.getElementById('butonlarKonteyneri');
     butonlarEl.innerHTML = '';
@@ -2040,6 +2099,7 @@
     anaHesap = balans;
     modalKapat('balanceModal');
     ekraniGuncelle();
+    if (document.getElementById('dashboardModal').classList.contains('active')) dashboardPaneliniAc();
   }
 
   // ---- New category modal ----
@@ -2104,7 +2164,7 @@
 
   // ---- Management modal ----
   function yonetimPaneliniAc() { modalListesiniDoldur(); modalAc('yonetimModal'); }
-  function yonetimPaneliniKapat() { modalKapat('yonetimModal'); menuAktifItemGuncelle('ana'); ekraniGuncelle(); }
+  function yonetimPaneliniKapat() { modalKapat('yonetimModal'); navAktifGuncelle('ana'); ekraniGuncelle(); }
 
   function modalListesiniDoldur() {
     const konteyner = document.getElementById('kategoriDuzenlemeListesi');
@@ -2287,10 +2347,10 @@
   function krediBorcuGoster() {
     guncelBorclarQrafikGoster();
     if (!krediBorcu) {
-      document.getElementById('krediBorcuMebleg').innerText = '0.00 AZN';
+      document.getElementById('krediBorcuMebleg').innerText = '—';
       document.getElementById('krediBorcuTarixler').innerText = '—';
-      document.getElementById('krediBorcuIrəliləyiş').innerText = '0/0 taksit ödənilib';
-      document.getElementById('krediBorcuQalan').innerText = 'Qalıq: 0.00 AZN';
+      document.getElementById('krediBorcuIrəliləyiş').innerText = '—';
+      document.getElementById('krediBorcuQalan').innerText = '—';
       document.getElementById('krediBorcuError').innerText = '';
       document.getElementById('krediBorcuAylikQrafik').innerHTML = '';
       const bosBtn = document.getElementById('krediBorcuOdeBtn');
@@ -2367,39 +2427,42 @@
   function modalAc(id) { document.getElementById(id).classList.add('active'); }
   function modalKapat(id) { document.getElementById(id).classList.remove('active'); }
 
-  // ---- Side menu ----
-  function menuAc() {
-    document.getElementById('sideMenu').classList.add('active');
-    document.getElementById('sideMenuOverlay').classList.add('active');
+  // ---- Alt naviqasiya (bottom tab bar) ----
+  function menuAc() {} // köhnə hamburger menyusundan qalan çağırışlar üçün zərərsiz boş funksiya
+  function menuKapat() {} // eyni səbəbdən boş funksiya
+  function navAktifGuncelle(secilen) {
+    document.getElementById('navDashboard').classList.toggle('active', secilen === 'dashboard');
+    document.getElementById('navAylikHesabat').classList.toggle('active', secilen === 'aylikHesabat');
+    document.getElementById('navAna').classList.toggle('active', secilen === 'ana');
+    document.getElementById('navHesablar').classList.toggle('active', secilen === 'hesablar');
+    document.getElementById('navAyarlar').classList.toggle('active', secilen === 'ayarlar');
   }
-  function menuKapat() {
-    document.getElementById('sideMenu').classList.remove('active');
-    document.getElementById('sideMenuOverlay').classList.remove('active');
+  // Alt paneldəki 5 ikondan biri seçiləndə çağırılır: əvvəlcə açıq olan bütün
+  // tam-ekran səhifələri bağlayır, sonra seçilən sekməni açır (ya da 'ana' üçün
+  // heç nə açmır — çünki o, #app konteynerinin özüdür).
+  function sekmeSec(sekme) {
+    modalKapat('dashboardModal');
+    modalKapat('aylikHesabatModal');
+    modalKapat('hesablarModal');
+    modalKapat('ayarlarModal');
+    navAktifGuncelle(sekme);
+    if (sekme === 'dashboard') dashboardPaneliniAc();
+    else if (sekme === 'aylikHesabat') aylikHesabatPaneliniAc();
+    else if (sekme === 'hesablar') hesablarPaneliniAc();
+    else if (sekme === 'ayarlar') ayarlarPaneliniAc();
+    else ekraniGuncelle();
   }
-  function menuAktifItemGuncelle(secilen) {
-    document.getElementById('menuAnaSehife').classList.toggle('active', secilen === 'ana');
-    document.getElementById('menuHesablar').classList.toggle('active', secilen === 'hesablar');
-    document.getElementById('menuAylikHesabat').classList.toggle('active', secilen === 'aylikHesabat');
-    document.getElementById('menuAyarlar').classList.toggle('active', secilen === 'ayarlar');
-  }
-  function menuAnaSehifeSec() {
-    menuAktifItemGuncelle('ana');
-    menuKapat();
-  }
-  function menuHesablarSec() {
-    menuAktifItemGuncelle('hesablar');
-    menuKapat();
-    hesablarPaneliniAc();
-  }
-  function menuAylikHesabatSec() {
-    menuAktifItemGuncelle('aylikHesabat');
-    menuKapat();
-    aylikHesabatPaneliniAc();
-  }
-  function menuAyarlarSec() {
-    menuAktifItemGuncelle('ayarlar');
-    menuKapat();
-    ayarlarPaneliniAc();
+  function dashboardPaneliniAc() {
+    const hesapDeger = typeof anaHesap === 'number' ? anaHesap : 0;
+    const limitDeger = (typeof kreditLimit === 'number') ? kreditLimit : 0;
+    const borcEl = document.getElementById('dashAnaHesapDeger');
+    borcEl.innerText = hesapDeger.toFixed(2) + ' AZN';
+    borcEl.style.color = hesapDeger < 0 ? '#ffb4c2' : '#fff';
+    const balansEl = document.getElementById('dashKrediBalansDeger');
+    balansEl.innerText = (limitDeger + hesapDeger).toFixed(2) + ' AZN';
+    balansEl.classList.toggle('low', (limitDeger + hesapDeger) < 0);
+    document.getElementById('dashKreditLimitDeger').innerText = limitDeger.toFixed(2) + ' AZN';
+    modalAc('dashboardModal');
   }
 
   // ==== Ayarlar: Günlük limit + Kateqoriyalar + Son əməliyyatlar + İşıq rejimi ====
@@ -2431,7 +2494,7 @@
   }
   function ayarlarPaneliniKapat() {
     modalKapat('ayarlarModal');
-    menuAktifItemGuncelle('ana');
+    navAktifGuncelle('ana');
     ekraniGuncelle();
   }
   function gunlukLimitYadSaxla() {
@@ -2566,7 +2629,7 @@
   }
 
   function aylikHesabatPaneliniAc() { aylikHesabatGoster(); modalAc('aylikHesabatModal'); }
-  function aylikHesabatPaneliniKapat() { modalKapat('aylikHesabatModal'); menuAktifItemGuncelle('ana'); }
+  function aylikHesabatPaneliniKapat() { modalKapat('aylikHesabatModal'); navAktifGuncelle('ana'); }
 
   function aylikHesabatGoster() {
     const { buAyToplam, kecenAyToplam, buAyCemi } = aylikHesabatVerisi();
@@ -2631,7 +2694,7 @@
 
   // ==== Son əməliyyatlar (tam tarixçə) ====
   function sonEmeliyyatlarPaneliniAc() { ekraniGuncelle(); modalAc('sonEmeliyyatlarModal'); }
-  function sonEmeliyyatlarPaneliniKapat() { modalKapat('sonEmeliyyatlarModal'); menuAktifItemGuncelle('ana'); }
+  function sonEmeliyyatlarPaneliniKapat() { modalKapat('sonEmeliyyatlarModal'); navAktifGuncelle('ana'); }
 
   // ==== Hesablar: Cash / Kredi kartı / Debit bank + transfer ====
   function hesabAdi(tip) {
@@ -2656,7 +2719,7 @@
   }
   function hesablarPaneliniKapat() {
     modalKapat('hesablarModal');
-    menuAktifItemGuncelle('ana');
+    navAktifGuncelle('ana');
     ekraniGuncelle();
   }
 
@@ -2827,10 +2890,10 @@
     });
   }
 
+  // veriYukle() özü firebaseBaslat()-ı çağırıb məlumatı Firebase-dən gətirir —
+  // burada ikinci dəfə çağırmırıq (Firebase App-i iki dəfə başlatmaq xəta verər).
   veriYukle();
   kilidYoxla();
-  firebaseBaslat();
-  firebasePanelGuncelle(); // localStorage-dakı mövcud Sync Key-i dərhal göstər (şəbəkəni gözləmədən)
 
   // ==== PWA: Service Worker qeydiyyatı ====
   // Yalnız http(s):// üzərində işləyir; file:// ilə açsan səssizcə keçilir.
