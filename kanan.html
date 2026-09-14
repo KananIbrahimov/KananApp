@@ -134,6 +134,8 @@
   .menu-balance-card .k { font-size: 11px; color: var(--gold-ink); font-weight: 600; }
   .menu-balance-card .v { font-size: 19px; font-weight: 700; color: var(--gold-ink-dark); margin-top: 2px; }
   .menu-balance-card .v.low { color: var(--danger); }
+  .menu-balance-card .v2 { font-size: 12.5px; font-weight: 600; color: var(--gold-ink); margin-top: 6px; padding-top: 6px; border-top: 1px solid var(--gold-line); }
+  .menu-balance-card .v2 b { color: var(--gold-ink-dark); font-weight: 700; }
   .side-menu .menu-item {
     display: flex; align-items: center; gap: 10px; padding: 11px 12px; border-radius: 10px;
     border: none; background: transparent; font-size: 14px; font-weight: 600; color: var(--ink);
@@ -495,6 +497,7 @@
   <div class="menu-balance-card" onclick="menuKapat(); hesablarPaneliniAc();" style="cursor:pointer;">
     <div class="k">Kredit kartımın güncel borcu</div>
     <div class="v" id="menuAnaHesapDeger">0.00 AZN</div>
+    <div class="v2">Kredi kartı balansı (istifadə edilə bilən): <b id="menuKrediBalansDeger">0.00 AZN</b></div>
   </div>
   <button class="menu-item active" id="menuAnaSehife" onclick="menuAnaSehifeSec()">🏠 Ana səhifə</button>
   <button class="menu-item" id="menuAylikHesabat" onclick="menuAylikHesabatSec()">📈 Aylıq xülasə</button>
@@ -1822,6 +1825,11 @@
       menuHesapEl.innerText = hesapDeger.toFixed(2) + ' AZN';
       menuHesapEl.classList.toggle('low', hesapDeger < 0);
     }
+    const menuBalansEl = document.getElementById('menuKrediBalansDeger');
+    if (menuBalansEl) {
+      const limitDeger = (typeof kreditLimit === 'number') ? kreditLimit : 0;
+      menuBalansEl.innerText = (limitDeger + hesapDeger).toFixed(2) + ' AZN';
+    }
 
     const butonlarEl = document.getElementById('butonlarKonteyneri');
     butonlarEl.innerHTML = '';
@@ -2780,6 +2788,14 @@
       const mevcud = hesabBakiyesiOxu(menbeTip);
       if (tutar > mevcud) {
         errEl.innerText = hesabAdi(menbeTip) + ' hesabında kifayət qədər balans yoxdur.';
+        return;
+      }
+    } else {
+      const limit = (typeof kreditLimit === 'number') ? kreditLimit : 0;
+      const borc = (typeof anaHesap === 'number') ? anaHesap : 0;
+      const muvcudLimit = limit + borc; // kredit kartında istifadə edilə bilən limit
+      if (tutar > muvcudLimit) {
+        errEl.innerText = 'Kredi kartında kifayət qədər istifadə edilə bilən limit yoxdur.';
         return;
       }
     }
