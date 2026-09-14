@@ -1364,6 +1364,7 @@
     // Verini indi bu funksiyanın Promise-i ilə (əvvəlcədən) gözləyirik, ona görə
     // "istifadəçi görməyəcək" gizli sorğu deyil — tətbiqin AÇILIŞ məlumatı bundan asılıdır.
     return new Promise((resolve) => {
+      if (!firebaseConfig.apiKey) { resolve(false); return; } // key silinib — heç bir hesaba avtomatik qoşulma yoxdur
       if (typeof firebase === 'undefined') { resolve(false); return; } // internet yoxdursa SDK yüklənməyib
       try {
         firebase.initializeApp(firebaseConfig);
@@ -1413,6 +1414,7 @@
   }
 
   function senkronKeyOlustur() {
+    if (!firebaseConfig.apiKey) { alert('Anlıq sinxronizasiya hazırda deaktiv edilib (köhnə açar silinib). İşə salmaq üçün kodda öz Firebase layihənizin konfiqini yazmalısınız.'); return; }
     senkronKey = uzunRastgeleKod(32);
     localStorage.setItem('firebase_sync_key', senkronKey);
     firebasePanelGuncelle();
@@ -1444,6 +1446,7 @@
   }
 
   function senkronKeyGirOnayla() {
+    if (!firebaseConfig.apiKey) { document.getElementById('senkronKeyGirError').innerText = 'Anlıq sinxronizasiya deaktiv edilib (köhnə açar silinib).'; return; }
     const val = document.getElementById('senkronKeyGirInput').value.trim();
     if (!val) {
       document.getElementById('senkronKeyGirError').innerText = 'Sync Key yaz.';
@@ -1623,19 +1626,18 @@
   }
 
   // ==== Məlumat mənbəyi: Firebase (Firestore) ====
-  // Tətbiq açılanda əvvəlcə Firebase-ə qoşulmağa çalışır və məlumatı ORADAN oxuyur.
-  // Sync Key yoxdursa (ilk açılış), avtomatik yaradılır — istifadəçi əl ilə heç nə
-  // etmədən tətbiq avtomatik olaraq öz Firebase hesabına bağlanır. Firebase əlçatan
-  // deyilsə (offline və ya SDK bloklanıb), yerli keşə keçilir ki, tətbiq işləməyə davam etsin.
+  // TƏHLÜKƏSİZLİK QAYDASI: tətbiq HEÇ VAXT özbaşına yeni Sync Key yaratmır və
+  // Firestore-a yazmır. Yalnız bu CİHAZDA daha əvvəl əl ilə yaradılmış/daxil
+  // edilmiş bir Sync Key varsa (localStorage-da saxlanılıb) həmin key ilə
+  // Firebase-dən oxumağa çalışır. Yəni linki başqası açsa, ona heç bir key
+  // verilmir və sənin datana avtomatik toxunulmur — sadəcə boş/yerli vəziyyət
+  // görünür. Sync yalnız "Yeni Sync Key yarat" və ya "Var olan Key-i gir"
+  // düymələrinə əl ilə basdıqda başlayır.
   async function veriYukle() {
     let firebaseDenGeldi = false;
     try {
       const hazir = await vaxtAsimiIle(firebaseBaslat(), 8000);
-      if (hazir && firestoreDb) {
-        if (!senkronKey) {
-          senkronKey = uzunRastgeleKod(32);
-          localStorage.setItem('firebase_sync_key', senkronKey);
-        }
+      if (hazir && firestoreDb && senkronKey) {
         const snap = await firestoreDb.collection('syncs').doc(senkronKey).get();
         if (snap.exists && snap.data() && snap.data().data) {
           driveVerisiniTetbiqEt(snap.data().data);
@@ -1648,8 +1650,6 @@
 
     if (!firebaseDenGeldi) {
       yerliVeriniYukle();
-      // İlk açılış (Firestore-da hələ sənəd yoxdur) — mövcud yerli vəziyyəti dərhal
-      // Firebase-ə köçürürük ki, bundan sonrakı hər açılış Firebase-dən oxusun.
       if (firebaseHazir && senkronKey) firebaseYazEt();
     }
 
