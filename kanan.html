@@ -313,6 +313,10 @@
   .modal-content p.hint, .page-inner p.hint { font-size: 12.5px; color: var(--muted); margin: 0 0 16px; }
   .modal-list { overflow-y: auto; flex: 1; margin-bottom: 14px; display: flex; flex-direction: column; gap: 10px; padding-right: 2px; }
   .modal-item { background: var(--panel-alt); border: 1px solid var(--line); border-radius: var(--radius-md); padding: 12px; display: flex; flex-direction: column; gap: 8px; }
+  /* Kateqoriyaların sürüşdürülərək sıralanması (drag-to-reorder) */
+  .modal-item.siralana-bilen { position: relative; }
+  .drag-handle { touch-action: none; cursor: grab; user-select: none; -webkit-user-select: none; font-size: 16px; color: var(--muted); padding: 0 4px; flex: 0 0 auto; line-height: 1; }
+  .modal-item.siralanan { opacity: 0.92; box-shadow: 0 8px 20px var(--shadow); z-index: 5; }
   .field-row { display: flex; align-items: center; gap: 8px; }
   .field-row.between { justify-content: space-between; }
   input[type="text"], input[type="number"] {
@@ -1604,7 +1608,7 @@
   }
   // ==================== /Firebase ====================
 
-  const APP_VERSION = '1.4'; // hər yeni göndərilən html versiyasında əl ilə +1 artırılır
+  const APP_VERSION = '1.6'; // hər yeni göndərilən html versiyasında əl ilə +1 artırılır
   let aktifDonem = 'gunluk';
   let goruntulenenTarix = new Date(); goruntulenenTarix.setHours(0, 0, 0, 0);
   let kategoriler = [];
@@ -2270,12 +2274,14 @@
     konteyner.innerHTML = '';
     kategoriler.forEach((kat, index) => {
       const item = document.createElement('div');
-      item.className = 'modal-item';
+      item.className = 'modal-item siralana-bilen';
+      item.dataset.origIndex = index;
       const renkler = renkPaleti.map(r =>
         `<span class="swatch ${kat.renk === r ? 'selected' : ''}" style="background:${r}" onclick="kategoriRenkGuncelle(${index}, '${r}')"></span>`
       ).join('');
       item.innerHTML = `
         <div class="field-row">
+          <span class="drag-handle" onpointerdown="kategoriSurukleBasla(event, this.closest('.modal-item'))">☰</span>
           <input type="text" value="${kat.ikon}" onchange="kategoriIkonGuncelle(${index}, this.value)" style="width:52px; text-align:center;">
           <input type="text" value="${kat.ad}" onchange="kategoriAdGuncelle(${index}, this.value)" style="flex:1;">
           <button onclick="kategoriSilOnayla(${index})" style="background:none; border:none; cursor:pointer; font-size:14px;">🗑</button>
@@ -2304,6 +2310,56 @@
   };
   window.kategoriRenkGuncelle = (i, renk) => { kategoriler[i].renk = renk; modalListesiniDoldur(); };
   window.kategoriSebebToggle = (i, checked) => { kategoriler[i].sebebSoruş = checked; };
+
+  // ---- Kateqoriyaların sürüşdürülərək sıralanması (drag-to-reorder) ----
+  // Barmaqla/mouse ilə "☰" işarəsindən tutub yuxarı-aşağı çəkməklə kateqoriyaların
+  // sırasını dəyişməyə imkan verir. Bu sıra tətbiqin hər yerində (xərc əlavə etmə,
+  // dashboard və s.) kateqoriyaların göstərilmə ardıcıllığını təyin edir.
+  let siralamaSurukleEl = null;
+  let siralamaKonteyner = null;
+
+  function kategoriSurukleBasla(ev, item) {
+    ev.preventDefault();
+    if (!item) return;
+    siralamaSurukleEl = item;
+    siralamaKonteyner = item.parentElement;
+    item.classList.add('siralanan');
+    document.addEventListener('pointermove', kategoriSurukleHereket);
+    document.addEventListener('pointerup', kategoriSurukleBitir, { once: true });
+    document.addEventListener('pointercancel', kategoriSurukleBitir, { once: true });
+  }
+
+  function kategoriSurukleHereket(ev) {
+    if (!siralamaSurukleEl || !siralamaKonteyner) return;
+    ev.preventDefault();
+    const clientY = ev.clientY;
+    const digerleri = [...siralamaKonteyner.querySelectorAll('.modal-item:not(.siralanan)')];
+    // Sürüklənən element hansı qonşunun ortasından keçibsə, onun yerini tutur.
+    let hedef = null;
+    for (const digeri of digerleri) {
+      const qutu = digeri.getBoundingClientRect();
+      const orta = qutu.top + qutu.height / 2;
+      if (clientY < orta) { hedef = digeri; break; }
+    }
+    if (hedef) {
+      siralamaKonteyner.insertBefore(siralamaSurukleEl, hedef);
+    } else {
+      siralamaKonteyner.appendChild(siralamaSurukleEl);
+    }
+  }
+
+  function kategoriSurukleBitir() {
+    document.removeEventListener('pointermove', kategoriSurukleHereket);
+    if (!siralamaSurukleEl || !siralamaKonteyner) return;
+    siralamaSurukleEl.classList.remove('siralanan');
+    // DOM-dakı yeni sıraya görə kategoriler massivini yenidən qururuq.
+    const yeniSira = [...siralamaKonteyner.children].map((el) => kategoriler[Number(el.dataset.origIndex)]);
+    kategoriler = yeniSira;
+    siralamaSurukleEl = null;
+    siralamaKonteyner = null;
+    veriKaydet();
+    modalListesiniDoldur();
+  }
 
   // ---- Monthly (utility/recurring) expenses ----
   function cariAyKodu() {
@@ -2449,10 +2505,10 @@
   // tam-ekran səhifələri bağlayır, sonra seçilən sekməni açır (ya da 'ana' üçün
   // heç nə açmır — çünki o, #app konteynerinin özüdür).
   function sekmeSec(sekme) {
-    modalKapat('dashboardModal');
-    modalKapat('aylikHesabatModal');
-    modalKapat('hesablarModal');
-    modalKapat('ayarlarModal');
+    // Bütün tam-ekran səhifələri (əsas sekmələr VƏ Ayarlar altındakı alt-səhifələr —
+    // Kateqoriyalar, Son əməliyyatlar) bağlayırıq ki, alt paneldən hansı sekməyə
+    // keçid edilsə, əvvəlki (alt-)səhifə arxada açıq qalıb üst-üstə düşməsin.
+    document.querySelectorAll('.page-screen').forEach((el) => el.classList.remove('active'));
     navAktifGuncelle(sekme);
     if (sekme === 'dashboard') dashboardPaneliniAc();
     else if (sekme === 'aylikHesabat') aylikHesabatPaneliniAc();
