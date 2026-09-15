@@ -1289,9 +1289,7 @@
     gunlukLimit = (typeof parsed.gunlukLimit === 'number') ? parsed.gunlukLimit : null;
     hesabEklenib = parsed.hesabEklenib || { nagd: false, debit: false, depozit: false };
     sonDeyisiklikVaxti = parsed.backupTarixi || new Date().toISOString();
-    try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify({ kategoriler, giderler, anaHesap, kreditLimit, krediBorcu, nagdBakiye, debitBakiye, depozitBakiye, hesabTransferleri, gunlukLimit, hesabEklenib, sonDeyisiklikVaxti }));
-    } catch (e) { console.error('Yadda saxlama xətası:', e); }
+    // QƏSDƏN localStorage-a YAZILMIR — yeganə mənbə Firestore-dur.
   }
 
   // Drive-dakı bütün "gider-takibi-backup_*" fayllarını (ən yenidən köhnəyə) qaytarır.
@@ -1665,7 +1663,7 @@
   // ==================== /Saatlıq avtomatik snapshot backup ====================
   // ==================== /Firebase ====================
 
-  const APP_VERSION = '1.7'; // hər yeni göndərilən html versiyasında əl ilə +1 artırılır
+  const APP_VERSION = '1.8'; // hər yeni göndərilən html versiyasında əl ilə +1 artırılır
   let aktifDonem = 'gunluk';
   let goruntulenenTarix = new Date(); goruntulenenTarix.setHours(0, 0, 0, 0);
   let kategoriler = [];
@@ -1723,52 +1721,23 @@
     };
   }
 
-  // Yerli keşdən (və ya heç nə yoxdursa defolt boş vəziyyətdən) yükləmə — YALNIZ
-  // Firebase əlçatan olmayanda (offline və ya SDK bloklanıbsa) ehtiyat variant kimi işlədilir.
+  // Firebase-dən oxuna bilmədikdə (key yoxdursa, ya da bağlantı alınmadısa) tətbiq
+  // ARTIQ heç bir yerli keşə müraciət ETMİR — sadəcə boş/defolt vəziyyətlə açılır.
+  // Bu, "yalnız Firebase-dən qidalanma" tələbinin dəqiq icrasıdır: köhnə, sinxron
+  // olmamış yerli məlumat heç vaxt ekrana çıxıb çaşdırmayacaq.
   function yerliVeriniYukle() {
-    try {
-      const raw = localStorage.getItem(STORAGE_KEY);
-      if (raw) {
-        const parsed = JSON.parse(raw);
-        kategoriler = parsed.kategoriler || varsayilanKategoriler;
-        giderler = parsed.giderler || [];
-        anaHesap = (typeof parsed.anaHesap === 'number') ? parsed.anaHesap : null;
-        kreditLimit = (typeof parsed.kreditLimit === 'number') ? parsed.kreditLimit : null;
-        krediBorcu = parsed.krediBorcu || krediBorcuKohnaBackupdanCixar(parsed.aylikXerclar);
-        nagdBakiye = (typeof parsed.nagdBakiye === 'number') ? parsed.nagdBakiye : 0;
-        debitBakiye = (typeof parsed.debitBakiye === 'number') ? parsed.debitBakiye : 0;
-        depozitBakiye = (typeof parsed.depozitBakiye === 'number') ? parsed.depozitBakiye : 0;
-        hesabTransferleri = parsed.hesabTransferleri || [];
-        gunlukLimit = (typeof parsed.gunlukLimit === 'number') ? parsed.gunlukLimit : null;
-        hesabEklenib = parsed.hesabEklenib || { nagd: false, debit: false, depozit: false };
-        sonDeyisiklikVaxti = parsed.sonDeyisiklikVaxti || null;
-      } else {
-        kategoriler = varsayilanKategoriler;
-        giderler = varsayilanGiderler.map(g => ({ ...g }));
-        anaHesap = null;
-        kreditLimit = null;
-        krediBorcu = null;
-        nagdBakiye = 0;
-        debitBakiye = 0;
-        depozitBakiye = 0;
-        hesabTransferleri = [];
-        gunlukLimit = null;
-        hesabEklenib = { nagd: false, debit: false, depozit: false };
-        sonDeyisiklikVaxti = null;
-      }
-    } catch (e) {
-      kategoriler = varsayilanKategoriler;
-      giderler = varsayilanGiderler.map(g => ({ ...g }));
-      anaHesap = null;
-      kreditLimit = null;
-      krediBorcu = null;
-      nagdBakiye = 0;
-      debitBakiye = 0;
-      depozitBakiye = 0;
-      hesabTransferleri = [];
-      gunlukLimit = null;
-      hesabEklenib = { nagd: false, debit: false, depozit: false };
-    }
+    kategoriler = varsayilanKategoriler;
+    giderler = varsayilanGiderler.map(g => ({ ...g }));
+    anaHesap = null;
+    kreditLimit = null;
+    krediBorcu = null;
+    nagdBakiye = 0;
+    debitBakiye = 0;
+    depozitBakiye = 0;
+    hesabTransferleri = [];
+    gunlukLimit = null;
+    hesabEklenib = { nagd: false, debit: false, depozit: false };
+    sonDeyisiklikVaxti = null;
   }
 
   // Vaxt aşımı ilə bir promise-i "yarışdırır" — Firebase həddindən artıq uzun
@@ -1790,6 +1759,7 @@
   // düymələrinə əl ilə basdıqda başlayır.
   async function veriYukle() {
     let firebaseDenGeldi = false;
+    let senedTesdiqlenmisBosdur = false; // Firebase-ə çatdıq VƏ sənəd HƏQİQƏTƏN boşdur (yeni key) — fərq: bağlantı xətası deyil
     try {
       const hazir = await vaxtAsimiIle(firebaseBaslat(), 8000);
       if (hazir && firestoreDb && senkronKey) {
@@ -1797,15 +1767,22 @@
         if (snap.exists && snap.data() && snap.data().data) {
           driveVerisiniTetbiqEt(snap.data().data);
           firebaseDenGeldi = true;
+        } else {
+          senedTesdiqlenmisBosdur = true;
         }
       }
     } catch (e) {
-      console.warn('Firebase-dən oxuma xətası, yerli keşə keçilir:', e);
+      console.warn('Firebase-dən oxuma xətası:', e);
     }
 
     if (!firebaseDenGeldi) {
       yerliVeriniYukle();
-      if (firebaseHazir && senkronKey) firebaseYazEt();
+      // TƏHLÜKƏSİZLİK: boş vəziyyəti buluda YALNIZ o halda yazırıq ki, Firebase-ə
+      // çatıb sənədin HƏQİQƏTƏN boş (yeni key) olduğunu təsdiqləmiş olaq. Əks halda
+      // (bağlantı xətası/vaxt aşımı) heç nə yazmırıq — real buludda olan datanı
+      // təsadüfən boşla əvəz etməmək üçün.
+      if (senedTesdiqlenmisBosdur) firebaseYazEt();
+      else if (senkronKey) firebasePanelGuncelle('Buluda qoşulmadı — yenidən cəhd et.', true);
     }
 
     veriYuklendi = true;
@@ -1823,7 +1800,7 @@
   async function veriKaydet() {
     try {
       sonDeyisiklikVaxti = new Date().toISOString();
-      localStorage.setItem(STORAGE_KEY, JSON.stringify({ kategoriler, giderler, anaHesap, kreditLimit, krediBorcu, nagdBakiye, debitBakiye, depozitBakiye, hesabTransferleri, gunlukLimit, hesabEklenib, sonDeyisiklikVaxti }));
+      // QƏSDƏN localStorage-a YAZILMIR — məlumatın YEGANƏ mənbəyi Firestore-dur.
       firebaseYazPlanla();
     } catch (e) {
       console.error('Yadda saxlama xətası:', e);
