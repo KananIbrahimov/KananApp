@@ -421,6 +421,23 @@
   .drive-box .drive-btns button { flex: 1; font-size: 11.5px; padding: 7px 6px; border-radius: 8px; border: 1px solid var(--line); background: var(--panel); cursor: pointer; font-weight: 600; color: var(--navy-soft); }
   .drive-box .drive-btns button:hover { border-color: var(--navy-soft); }
 
+  /* Ayarlar səhifəsindəki bütün sətir ikonları eyni ölçü/boşluqla düzülsün deyə */
+  .ayarlar-ikon { display: inline-flex; align-items: center; justify-content: center; width: 20px; font-size: 15px; margin-right: 8px; flex: 0 0 auto; }
+  .ayarlar-metin { display: inline-flex; align-items: center; }
+  /* Ayarlar səhifəsindəki bütün qutucuqlar (Kateqoriyalar, Son əməliyyatlar, İşıqlı rejim,
+     Tətbiq kilidi, System, Yenilə, Günlük limit) eyni ölçü/şrift/haşiyə istifadə etsin deyə vahid siniflər */
+  .ayarlar-kutu {
+    box-sizing: border-box; width: 100%; border: 1px solid var(--line); border-radius: var(--radius-md);
+    padding: 13px 14px; background: transparent; font-family: inherit; text-align: left;
+  }
+  .ayarlar-setir-ic {
+    display: flex; align-items: center; justify-content: space-between; gap: 10px;
+    font-size: 14px; font-weight: 600; color: var(--ink); line-height: 1.3;
+  }
+  button.ayarlar-kutu { cursor: pointer; }
+  button.ayarlar-kutu:hover { border-color: var(--navy-soft); }
+  .error-text:empty { display: none; margin: 0; min-height: 0; }
+
   .theme-toggle-row {
     display: flex; align-items: center; justify-content: space-between; padding: 11px 12px; border-radius: 10px;
     font-size: 14px; font-weight: 600; color: var(--ink);
@@ -721,32 +738,38 @@
       <h2 style="margin:0; flex:1;">Ayarlar</h2>
     </div>
 
-    <div class="modal-item" style="margin-bottom:14px;">
-      <b>Günlük xərc limiti</b>
-      <p class="hint" style="margin:0;">Gündəlik xərclər bu məbləği keçəndə xəbərdarlıq rəngi görünəcək.</p>
-      <div class="field-row" style="gap:8px;">
-        <input type="number" step="0.01" min="0" id="gunlukLimitInput" placeholder="Məs: 20" style="flex:1;">
-        <button class="btn btn-primary" onclick="gunlukLimitYadSaxla()" style="white-space:nowrap;">Yadda saxla</button>
+    <div class="ayarlar-kutu" style="margin-bottom:14px;">
+      <div class="ayarlar-setir-ic" style="gap:8px;">
+        <span class="ayarlar-metin" style="white-space:nowrap;">Günlük xərc limiti</span>
+        <div style="display:flex; gap:6px; align-items:center;">
+          <input type="number" step="0.01" min="0" id="gunlukLimitInput" placeholder="20" style="width:64px; padding:8px; border:1px solid var(--input-border); border-radius:8px; font-size:14px; background:var(--panel); color:var(--ink);">
+          <button class="btn btn-primary" onclick="gunlukLimitYadSaxla()" style="white-space:nowrap; padding:8px 12px; font-size:13px;">Yadda saxla</button>
+        </div>
       </div>
       <div class="error-text" id="gunlukLimitError"></div>
     </div>
 
-    <button class="btn btn-ghost" style="width:100%; justify-content:flex-start; border:1px solid var(--line); margin-bottom:8px;" onclick="ayarlarKateqoriyalarAc()">⚙ Kateqoriyalar</button>
-    <button class="btn btn-ghost" style="width:100%; justify-content:flex-start; border:1px solid var(--line); margin-bottom:14px;" onclick="ayarlarSonEmeliyyatlarAc()">🧾 Son əməliyyatlar</button>
+    <button class="ayarlar-kutu ayarlar-setir-ic" style="justify-content:flex-start; margin-bottom:8px;" onclick="ayarlarKateqoriyalarAc()"><span class="ayarlar-ikon">⚙️</span><span class="ayarlar-metin">Kateqoriyalar</span></button>
+    <button class="ayarlar-kutu ayarlar-setir-ic" style="justify-content:flex-start; margin-bottom:14px;" onclick="ayarlarSonEmeliyyatlarAc()"><span class="ayarlar-ikon">🧾</span><span class="ayarlar-metin">Son əməliyyatlar</span></button>
 
-    <div class="theme-toggle-row" style="border:1px solid var(--line); border-radius:var(--radius-md); padding:12px 14px; margin-bottom:8px;">
-      <span id="temaLabel">🌙 Qaranlıq rejim</span>
+    <div class="ayarlar-kutu ayarlar-setir-ic" style="margin-bottom:8px;">
+      <span id="temaLabel" style="display:flex; align-items:center;"></span>
       <button class="theme-switch" id="temaSwitch" onclick="temaDeyis()" aria-label="Tema dəyiş"></button>
     </div>
 
-    <div class="modal-item" style="margin-bottom:14px;">
-      <div class="theme-toggle-row" style="padding:0;">
-        <span id="kilidAyarLabel">🔒 Tətbiq kilidi (Face ID / PIN)</span>
+    <div class="ayarlar-kutu" style="margin-bottom:14px;">
+      <div class="ayarlar-setir-ic">
+        <span id="kilidAyarLabel" style="display:flex; align-items:center;"></span>
         <button class="toggle-switch" id="kilidAyarSwitch" onclick="kilidToggle()" aria-label="Tətbiq kilidini aç/bağla"></button>
       </div>
-      <p class="hint" style="margin:6px 0 0;">Açıq olanda tətbiqi hər açışda Face ID/Touch ID (dəstəklənmirsə PIN) ilə təsdiqləməli olursan.</p>
       <div class="error-text" id="kilidAyarError"></div>
     </div>
+
+    <button class="ayarlar-kutu ayarlar-setir-ic" id="sistemBaslikBtn" style="margin-bottom:8px;" onclick="sistemBolmesiToggle()">
+      <span style="display:flex; align-items:center;"><span class="ayarlar-ikon">⚙️</span><span class="ayarlar-metin">System</span></span>
+      <span id="sistemBaslikOx" style="transition:transform .15s;">▾</span>
+    </button>
+    <div id="sistemBolmesi" style="display:none;">
 
     <h3 style="font-size:14px; margin:18px 0 10px; color:var(--ink);">☁️ Google Drive (əl ilə yedəkləmə)</h3>
     <div class="drive-box" id="driveBox">
@@ -770,17 +793,19 @@
     </div>
 
     <h3 style="font-size:14px; margin:18px 0 10px; color:var(--ink);">💾 Yedək faylı</h3>
-    <button class="btn btn-ghost" id="menuBackupIndir" style="width:100%; justify-content:flex-start; border:1px solid var(--line); margin-bottom:8px;" onclick="backupIndir()">📥 Backup yüklə (JSON)</button>
-    <button class="btn btn-ghost" id="menuBackupBerpa" style="width:100%; justify-content:flex-start; border:1px solid var(--line); margin-bottom:14px;" onclick="document.getElementById('backupFileInput').click()">📤 Backup bərpa et</button>
+    <button class="ayarlar-kutu ayarlar-setir-ic" id="menuBackupIndir" style="justify-content:flex-start; margin-bottom:8px;" onclick="backupIndir()"><span class="ayarlar-ikon">📥</span><span class="ayarlar-metin">Backup yüklə (JSON)</span></button>
+    <button class="ayarlar-kutu ayarlar-setir-ic" id="menuBackupBerpa" style="justify-content:flex-start; margin-bottom:14px;" onclick="document.getElementById('backupFileInput').click()"><span class="ayarlar-ikon">📤</span><span class="ayarlar-metin">Backup bərpa et</span></button>
     <input type="file" id="backupFileInput" accept="application/json" style="display:none;" onchange="backupBerpaEt(event)">
 
-    <h3 style="font-size:14px; margin:18px 0 10px; color:var(--ink);">🔄 Tətbiq versiyası</h3>
-    <button class="btn btn-ghost" style="width:100%; justify-content:flex-start; border:1px solid var(--line); margin-bottom:8px;" onclick="tetbiqiYenile()">🔄 Yenilə (son versiyanı yüklə)</button>
-    <p class="hint" style="margin:0 0 14px;">Yeniləmə etsəm belə köhnə görünürsə bunu bas — keşi təmizləyib son versiyanı yenidən yükləyir. Ana ekrandan silib-yenidən əlavə etməyə ehtiyac qalmır.</p>
+    </div>
+
+    <button class="ayarlar-kutu ayarlar-setir-ic" style="justify-content:flex-start; margin-bottom:14px;" onclick="tetbiqiYenile()"><span class="ayarlar-ikon">🔄</span><span class="ayarlar-metin">Yenilə (son versiyanı yüklə)</span></button>
 
     <div class="modal-footer" style="justify-content:flex-end; margin-top:16px;">
       <button class="btn btn-ghost" onclick="ayarlarPaneliniKapat()">Bağla</button>
     </div>
+    <p style="text-align:center; font-size:11px; color:var(--muted); margin:18px 0 0;">Powered by Kanan Ibrahimov</p>
+    <p style="text-align:center; font-size:10px; color:var(--muted); margin:2px 0 0;">Version <span id="tetbiqVersiyaGoster"></span></p>
   </div>
 </div>
 
@@ -980,7 +1005,9 @@
   function temaTetbiqEt(tema) {
     document.documentElement.setAttribute('data-theme', tema === 'dark' ? 'dark' : 'light');
     const lbl = document.getElementById('temaLabel');
-    if (lbl) lbl.innerText = tema === 'dark' ? '☀️ İşıqlı rejim' : '🌙 Qaranlıq rejim';
+    if (lbl) lbl.innerHTML = tema === 'dark'
+      ? '<span class="ayarlar-ikon">☀️</span><span class="ayarlar-metin">İşıqlı rejim</span>'
+      : '<span class="ayarlar-ikon">🌙</span><span class="ayarlar-metin">Qaranlıq rejim</span>';
   }
   function temaDeyis() {
     const cari = localStorage.getItem('tema') === 'dark' ? 'dark' : 'light';
@@ -1059,7 +1086,9 @@
     const lbl = document.getElementById('kilidAyarLabel');
     if (!sw) return;
     sw.classList.toggle('on', kilidVar);
-    lbl.innerText = kilidVar ? '🔒 Tətbiq kilidi (aktiv)' : '🔒 Tətbiq kilidi (Face ID / PIN)';
+    lbl.innerHTML = kilidVar
+      ? '<span class="ayarlar-ikon">🔒</span><span class="ayarlar-metin">Tətbiq kilidi (aktiv)</span>'
+      : '<span class="ayarlar-ikon">🔒</span><span class="ayarlar-metin">Tətbiq kilidi (Face ID / PIN)</span>';
     document.getElementById('kilidAyarError').innerText = '';
   }
 
@@ -1575,6 +1604,7 @@
   }
   // ==================== /Firebase ====================
 
+  const APP_VERSION = '1.4'; // hər yeni göndərilən html versiyasında əl ilə +1 artırılır
   let aktifDonem = 'gunluk';
   let goruntulenenTarix = new Date(); goruntulenenTarix.setHours(0, 0, 0, 0);
   let kategoriler = [];
@@ -2538,6 +2568,8 @@
     kilidAyarGoster();
     driveMenyuGuncelle();
     firebasePanelGuncelle();
+    const versEl = document.getElementById('tetbiqVersiyaGoster');
+    if (versEl) versEl.innerText = APP_VERSION;
     modalAc('ayarlarModal');
   }
   function ayarlarPaneliniKapat() {
@@ -2564,6 +2596,15 @@
   function ayarlarSonEmeliyyatlarAc() {
     modalKapat('ayarlarModal');
     sonEmeliyyatlarPaneliniAc();
+  }
+  // "System" bölməsi: Google Drive + Firebase + Yedək faylı bir başlığın altında,
+  // açılıb-bağlanan (collapsible) qrup kimi.
+  function sistemBolmesiToggle() {
+    const kutu = document.getElementById('sistemBolmesi');
+    const ox = document.getElementById('sistemBaslikOx');
+    const acilir = kutu.style.display === 'none';
+    kutu.style.display = acilir ? 'block' : 'none';
+    ox.style.transform = acilir ? 'rotate(180deg)' : 'rotate(0deg)';
   }
 
   // ==== Aylıq xülasə: "Bu ay hara pul gedir?" ====
