@@ -256,7 +256,7 @@
   .list-item button:hover { color: var(--danger); }
   .empty-note { color: #9aa3b5; text-align: center; font-size: 13.5px; padding: 18px 0; margin: 0; }
 
-  .modal { position: fixed; inset: 0; background: var(--overlay); display: none; align-items: center; justify-content: center; padding: 16px; z-index: 50; }
+  .modal { position: fixed; inset: 0; background: var(--overlay); display: none; align-items: center; justify-content: center; padding: 16px; z-index: 70; }
   .modal.active { display: flex; }
   #confirmModal { z-index: 70; }
   #newCatModal { z-index: 70; }
@@ -2228,7 +2228,7 @@
 
   // ---- Management modal ----
   function yonetimPaneliniAc() { modalListesiniDoldur(); modalAc('yonetimModal'); }
-  function yonetimPaneliniKapat() { modalKapat('yonetimModal'); navAktifGuncelle('ana'); ekraniGuncelle(); }
+  function yonetimPaneliniKapat() { modalKapat('yonetimModal'); ekraniGuncelle(); ayarlarPaneliniAc(); }
 
   function modalListesiniDoldur() {
     const konteyner = document.getElementById('kategoriDuzenlemeListesi');
@@ -2725,7 +2725,7 @@
 
   // ==== Son əməliyyatlar (tam tarixçə) ====
   function sonEmeliyyatlarPaneliniAc() { ekraniGuncelle(); modalAc('sonEmeliyyatlarModal'); }
-  function sonEmeliyyatlarPaneliniKapat() { modalKapat('sonEmeliyyatlarModal'); navAktifGuncelle('ana'); }
+  function sonEmeliyyatlarPaneliniKapat() { modalKapat('sonEmeliyyatlarModal'); ayarlarPaneliniAc(); }
 
   // ==== Hesablar: Cash / Kredi kartı / Debit bank + transfer ====
   function hesabAdi(tip) {
