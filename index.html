@@ -1450,6 +1450,7 @@
 
   let firestoreDb = null;
   let firebaseHazir = false;
+  let firebaseKullanici = null; // signInWithPopup ilə daxil olmuş Google istifadəçisi (əvvəllər anonim idi)
   let firebaseUnsubscribe = null;
   let firebaseYazTimer = null;
   let senkronKey = localStorage.getItem('firebase_sync_key') || null;
@@ -1467,19 +1468,26 @@
   function firebaseBaslat() {
     // Verini indi bu funksiyanın Promise-i ilə (əvvəlcədən) gözləyirik, ona görə
     // "istifadəçi görməyəcək" gizli sorğu deyil — tətbiqin AÇILIŞ məlumatı bundan asılıdır.
+    // QEYD: burada artıq signInAnonymously YOXDUR. Səhifə açılanda popup
+    // ÇIXMIR — yalnız əvvəllər Google ilə daxil olunubsa (sessiya brauzerdə
+    // saxlanılıb) həmin sessiya sükutla tanınır. Yeni giriş yalnız istifadəçi
+    // "Yeni Sync Key yarat" / "Var olan Key-i gir" düyməsinə basanda,
+    // firebaseGoogleIleGirisYap() ilə (əsl klik hadisəsi daxilində) açılır.
     return new Promise((resolve) => {
-      if (!firebaseConfig.apiKey) { resolve(false); return; } // key silinib — heç bir hesaba avtomatik qoşulma yoxdur
-      if (typeof firebase === 'undefined') { resolve(false); return; } // internet yoxdursa SDK yüklənməyib
+      if (!firebaseConfig.apiKey) { resolve(false); return; }
+      if (typeof firebase === 'undefined') { resolve(false); return; }
       try {
-        firebase.initializeApp(firebaseConfig);
+        if (!firebase.apps.length) firebase.initializeApp(firebaseConfig);
         firestoreDb = firebase.firestore();
-        firebase.auth().signInAnonymously().then(() => {
-          firebaseHazir = true;
-          if (senkronKey) firebaseDinlemeyeBasla(); // yavaş şəbəkədə vaxt aşımından sonra da gec-tez qoşulsun
+        const dinle = firebase.auth().onAuthStateChanged((user) => {
+          dinle(); // yalnız ilk vəziyyəti oxu, sonra dayandır (sürəkli dinləmə lazım deyil)
+          firebaseKullanici = user || null;
+          firebaseHazir = true; // Firestore/App hazırdır — bu, giriş edildiyi anlamına gəlmir
+          if (senkronKey && firebaseKullanici) firebaseDinlemeyeBasla();
           firebasePanelGuncelle();
-          resolve(true);
-        }).catch((e) => {
-          console.warn('Firebase giriş xətası:', e);
+          resolve(!!firebaseKullanici);
+        }, (e) => {
+          console.warn('Firebase auth xətası:', e);
           firebasePanelGuncelle('Bağlantı alınmadı.', true);
           resolve(false);
         });
@@ -1487,6 +1495,25 @@
         console.warn('Firebase başlatma xətası:', e);
         resolve(false);
       }
+    });
+  }
+
+  // Google ilə giriş — YALNIZ əsl bir klik hadisəsinin (button onclick) içindən
+  // çağırılmalıdır, əks halda brauzer popup-u bloklaya bilər.
+  function firebaseGoogleIleGirisYap() {
+    if (typeof firebase === 'undefined' || !firestoreDb) return Promise.resolve(false);
+    return firebase.auth().signInWithPopup(new firebase.auth.GoogleAuthProvider()).then((sonuc) => {
+      firebaseKullanici = sonuc.user || null;
+      firebasePanelGuncelle();
+      return !!firebaseKullanici;
+    }).catch((e) => {
+      console.warn('Google ilə giriş xətası:', e);
+      if (e && e.code === 'auth/popup-blocked') {
+        alert('Brauzer popup-u blokladı. Zəhmət olmasa bu sayt üçün popup-lara icazə ver və yenidən cəhd et.');
+      } else if (e && e.code !== 'auth/popup-closed-by-user' && e.code !== 'auth/cancelled-popup-request') {
+        alert('Google ilə giriş alınmadı: ' + (e.message || e.code || 'naməlum xəta'));
+      }
+      return false;
     });
   }
 
@@ -1506,12 +1533,15 @@
     }
 
     if (senkronKey) {
-      subEl.innerText = 'Bu Sync Key-i digər cihazına da (bir dəfə) daxil et ki, ikisi avtomatik sinxronlaşsın.';
+      const kimlik = firebaseKullanici ? (firebaseKullanici.email || firebaseKullanici.displayName || 'Google hesabı') : null;
+      subEl.innerText = kimlik
+        ? ('Bu Sync Key-i digər cihazına da (bir dəfə) daxil et ki, ikisi avtomatik sinxronlaşsın. (' + kimlik + ' ilə bağlısan)')
+        : 'Bu Sync Key-i digər cihazına da (bir dəfə) daxil et ki, ikisi avtomatik sinxronlaşsın.';
       keyGosterimEl.style.display = 'block';
       keyGosterimEl.innerText = senkronKey;
       btnsEl.innerHTML = '<button onclick="senkronKeyKopyala()">📋 Kopyala</button><button onclick="senkronKeySil()">Bağlantını kəs</button>';
     } else {
-      subEl.innerText = 'Telefon və kompüter arasında 1-2 saniyədə avtomatik sinxron üçün bir Sync Key lazımdır.';
+      subEl.innerText = 'Telefon və kompüter arasında 1-2 saniyədə avtomatik sinxron üçün Google hesabınla giriş və bir Sync Key lazımdır.';
       keyGosterimEl.style.display = 'none';
       btnsEl.innerHTML = '<button onclick="senkronKeyOlustur()">🔑 Yeni Sync Key yarat</button><button onclick="senkronKeyGirModalAc()">📋 Var olan Key-i gir</button>';
     }
@@ -1552,8 +1582,16 @@
     else if (davamEt === 'gir') senkronKeyGirModalAc();
   }
 
-  function senkronKeyOlustur() {
+  async function senkronKeyOlustur() {
     if (!firebaseConfig.apiKey) { firebaseKonfiqModalAc('olustur'); return; }
+    if (!firebaseHazir) {
+      const hazir = await vaxtAsimiIle(firebaseBaslat(), 15000);
+      if (!hazir && !firestoreDb) { alert('Buluda qoşulmadı, internetini yoxla və yenidən cəhd et.'); return; }
+    }
+    if (!firebaseKullanici) {
+      const girisOldu = await firebaseGoogleIleGirisYap();
+      if (!girisOldu) return; // xəta mesajı artıq firebaseGoogleIleGirisYap içində göstərilib
+    }
     senkronKey = uzunRastgeleKod(32);
     localStorage.setItem('firebase_sync_key', senkronKey);
     veriMenbeGuvenli = true; // tamamilə yeni key — cari yerli vəziyyəti bilə-bilə buluda göndəririk
@@ -1605,11 +1643,20 @@
 
     try {
       if (!firebaseHazir) {
-        const hazir = await vaxtAsimiIle(firebaseBaslat(), 15000);
-        if (!hazir || !firestoreDb) {
+        await vaxtAsimiIle(firebaseBaslat(), 15000);
+        if (!firestoreDb) {
           errEl.innerText = 'Buluda qoşulmadı, internetini yoxla və yenidən cəhd et.';
           return;
         }
+      }
+      if (!firebaseKullanici) {
+        errEl.innerText = 'Google ilə giriş tələb olunur...';
+        const girisOldu = await firebaseGoogleIleGirisYap();
+        if (!girisOldu) {
+          errEl.innerText = 'Google ilə giriş edilmədi, yenidən cəhd et.';
+          return;
+        }
+        errEl.innerText = 'Buluddan yüklənir...';
       }
 
       const snap = await firestoreDb.collection('syncs').doc(val).get();
