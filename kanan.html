@@ -2442,6 +2442,8 @@
     const legendEl = document.getElementById(legendId);
     if (!canvasEl || !legendEl) return null;
     const dolu = parcalar.filter(p => p.tutar > 0);
+    const pulVahididirmi = (vahid || '').indexOf('AZN') !== -1;
+    const deyerYaz = (v) => pulVahididirmi ? v.toFixed(2) : Math.round(v).toString();
     legendEl.innerHTML = '';
     if (dolu.length === 0) {
       legendEl.innerHTML = `<div class="pie-empty">${emptyMesaj || 'Məlumat yoxdur.'}</div>`;
@@ -2454,7 +2456,7 @@
     dolu.forEach(p => {
       const row = document.createElement('div');
       row.className = 'pie-legend-row';
-      row.innerHTML = `<span class="lbl"><span class="dot" style="background:${p.renk}"></span>${p.ad}</span><span class="amt">${p.tutar.toFixed(0)}${vahid}</span>`;
+      row.innerHTML = `<span class="lbl"><span class="dot" style="background:${p.renk}"></span>${p.ad}</span><span class="amt">${deyerYaz(p.tutar)}${vahid}</span>`;
       legendEl.appendChild(row);
     });
     return new Chart(canvasEl.getContext('2d'), {
@@ -2469,7 +2471,7 @@
           legend: { display: false },
           tooltip: {
             callbacks: {
-              label: (ctx) => ` ${ctx.label}: ${Math.round(ctx.parsed)}${vahid}`
+              label: (ctx) => ` ${ctx.label}: ${deyerYaz(ctx.parsed)}${vahid}`
             }
           }
         }
@@ -2485,7 +2487,7 @@
     const depozitBorcu = (hesabEklenib.depozit && typeof depozitBakiye === 'number' && depozitBakiye < 0) ? Math.abs(depozitBakiye) : 0;
     const krediBorcuQalan = krediBorcuQalanHesabla();
     const umumiCemi = kkBorcu + depozitBorcu + krediBorcuQalan;
-    document.getElementById('dashUmumiBorcMerkez').innerText = umumiCemi > 0 ? umumiCemi.toFixed(0) : '0';
+    document.getElementById('dashUmumiBorcMerkez').innerText = umumiCemi > 0 ? umumiCemi.toFixed(2) : '0.00';
     dashUmumiBorcChart = dairaviCiz('dashUmumiBorcCanvas', dashUmumiBorcChart, [
       { ad: 'Kredit kartı borcu', tutar: kkBorcu, renk: '#c99a3a' },
       { ad: 'Deposit borcu', tutar: depozitBorcu, renk: '#b5533f' },
@@ -2497,7 +2499,7 @@
     const hesapDeger = typeof anaHesap === 'number' ? anaHesap : 0;
     const istifade = hesapDeger < 0 ? Math.abs(hesapDeger) : 0;
     const qalanLimit = Math.max(0, limitDeger + hesapDeger);
-    document.getElementById('dashKrediKartMerkez').innerText = (typeof kreditLimit === 'number') ? limitDeger.toFixed(0) : '—';
+    document.getElementById('dashKrediKartMerkez').innerText = (typeof kreditLimit === 'number') ? limitDeger.toFixed(2) : '—';
     dashKrediKartChart = dairaviCiz('dashKrediKartCanvas', dashKrediKartChart, (typeof kreditLimit === 'number') ? [
       { ad: 'İstifadə olunan', tutar: istifade, renk: '#c0435a' },
       { ad: 'İstifadə edilə bilən', tutar: qalanLimit, renk: '#1f2a44' }
