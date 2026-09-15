@@ -1387,13 +1387,18 @@
   // dəyişikliyi ANINDA (adətən 1 saniyədən az) digər açıq cihazlara "itələyir".
   // Təhlükəsizlik: giriş şifrə ilə deyil, uzun/rastgele "Sync Key" ilədir — key-i
   // yalnız öz cihazlarına yaz, kimsə ilə paylaşma (onu bilən, məlumatına baxa bilər).
+  // Bu bölmə boş saxlanılır ki, faylı GitHub/başqasına göndərəndə heç bir
+  // Firebase açarı və ya layihə adı görünməsin. Anlıq sinxronizasiyanı ÖZÜN
+  // üçün aktivləşdirmək istəsən, bu 6 sahəni YALNIZ öz cihazındakı (paylaşmadığın)
+  // fayl nüsxəsində öz Firebase layihənin konfiqi ilə doldur — bu fayl daxilində
+  // heç bir maliyyə məlumatı saxlanılmır, o localStorage/Firestore-da qalır.
   const firebaseConfig = {
-    apiKey: "AIzaSyBGpwU5D_dYxAUk-RTymjK_rq1K9VL3V0E",
-    authDomain: "kananapp-8d1c3.firebaseapp.com",
-    projectId: "kananapp-8d1c3",
-    storageBucket: "kananapp-8d1c3.firebasestorage.app",
-    messagingSenderId: "464092357661",
-    appId: "1:464092357661:web:bbe87e89cf467b8dfdd2f4"
+    apiKey: "",
+    authDomain: "",
+    projectId: "",
+    storageBucket: "",
+    messagingSenderId: "",
+    appId: ""
   };
 
   let firestoreDb = null;
@@ -2458,7 +2463,17 @@
         labels: dolu.map(p => p.ad),
         datasets: [{ data: dolu.map(p => p.tutar), backgroundColor: dolu.map(p => p.renk), borderWidth: 2, borderColor: cssVar('--panel') || '#fff' }]
       },
-      options: { cutout: '68%', plugins: { legend: { display: false } } }
+      options: {
+        cutout: '68%',
+        plugins: {
+          legend: { display: false },
+          tooltip: {
+            callbacks: {
+              label: (ctx) => ` ${ctx.label}: ${Math.round(ctx.parsed)}${vahid}`
+            }
+          }
+        }
+      }
     });
   }
 
@@ -2467,7 +2482,7 @@
 
     // 1. Ümumi borc: Kredit kartı borcu + Deposit borcu + Kredit borcu (xətt)
     const kkBorcu = (typeof anaHesap === 'number' && anaHesap < 0) ? Math.abs(anaHesap) : 0;
-    const depozitBorcu = (typeof depozitBakiye === 'number' && depozitBakiye < 0) ? Math.abs(depozitBakiye) : 0;
+    const depozitBorcu = (hesabEklenib.depozit && typeof depozitBakiye === 'number' && depozitBakiye < 0) ? Math.abs(depozitBakiye) : 0;
     const krediBorcuQalan = krediBorcuQalanHesabla();
     const umumiCemi = kkBorcu + depozitBorcu + krediBorcuQalan;
     document.getElementById('dashUmumiBorcMerkez').innerText = umumiCemi > 0 ? umumiCemi.toFixed(0) : '0';
