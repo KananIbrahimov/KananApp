@@ -678,6 +678,22 @@
   </div>
 </div>
 
+<!-- Firebase layihə konfiqi gir (YALNIZ bu cihazda, localStorage-da saxlanılır — fayl daxilində DEYİL, GitHub-a getmir) -->
+<div id="firebaseKonfiqModal" class="modal">
+  <div class="modal-content">
+    <h2>Öz Firebase layihən</h2>
+    <p class="hint">Anlıq sinxronizasiya üçün öz Firebase/Firestore layihənin konfiqini bura yaz. Bu məlumat YALNIZ bu cihazın brauzer yaddaşında (localStorage) saxlanılır — fayl daxilinə yazılmır, GitHub-a getmir.</p>
+    <input type="text" id="firebaseKonfiqApiKey" placeholder="apiKey" style="font-family:monospace; font-size:12px;">
+    <input type="text" id="firebaseKonfiqAuthDomain" placeholder="authDomain (məs: layihe.firebaseapp.com)" style="font-family:monospace; font-size:12px; margin-top:8px;">
+    <input type="text" id="firebaseKonfiqProjectId" placeholder="projectId" style="font-family:monospace; font-size:12px; margin-top:8px;">
+    <div class="error-text" id="firebaseKonfiqError"></div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="modalKapat('firebaseKonfiqModal')">Ləğv et</button>
+      <button class="btn btn-primary" onclick="firebaseKonfiqKaydet()">Yadda saxla</button>
+    </div>
+  </div>
+</div>
+
 <!-- Xərci düzəlt / köhnə tarixli xərc əlavə et -->
 <div id="islemFormModal" class="modal">
   <div class="modal-content">
@@ -1418,19 +1434,19 @@
   // dəyişikliyi ANINDA (adətən 1 saniyədən az) digər açıq cihazlara "itələyir".
   // Təhlükəsizlik: giriş şifrə ilə deyil, uzun/rastgele "Sync Key" ilədir — key-i
   // yalnız öz cihazlarına yaz, kimsə ilə paylaşma (onu bilən, məlumatına baxa bilər).
-  // Bu bölmə boş saxlanılır ki, faylı GitHub/başqasına göndərəndə heç bir
-  // Firebase açarı və ya layihə adı görünməsin. Anlıq sinxronizasiyanı ÖZÜN
-  // üçün aktivləşdirmək istəsən, bu 6 sahəni YALNIZ öz cihazındakı (paylaşmadığın)
-  // fayl nüsxəsində öz Firebase layihənin konfiqi ilə doldur — bu fayl daxilində
-  // heç bir maliyyə məlumatı saxlanılmır, o localStorage/Firestore-da qalır.
-  const firebaseConfig = {
-    apiKey: "AIzaSyBGpwU5D_dYxAUk-RTymjK_rq1K9VL3V0E",
-    authDomain: "kananapp-8d1c3.firebaseapp.com",
-    projectId: "kananapp-8d1c3",
-    storageBucket: "kananapp-8d1c3.firebasestorage.app",
-    messagingSenderId: "464092357661",
-    appId: "1:464092357661:web:bbe87e89cf467b8dfdd2f4"
-  };
+  // Bu bölmədə artıq HEÇ BİR açar/layihə adı kodun daxilində saxlanılmır.
+  // Hər istifadəçi "Anlıq sinxronizasiya" düyməsinə basanda öz Firebase
+  // layihəsinin konfiqini (apiKey, authDomain, projectId) daxil edir — bu
+  // dəyərlər YALNIZ həmin cihazın brauzer yaddaşında (localStorage) qalır,
+  // fayla yazılmır, deməli GitHub-a və ya başqa heç bir yerə getmir.
+  function firebaseConfigOxu() {
+    return {
+      apiKey: localStorage.getItem('fb_apiKey') || '',
+      authDomain: localStorage.getItem('fb_authDomain') || '',
+      projectId: localStorage.getItem('fb_projectId') || ''
+    };
+  }
+  let firebaseConfig = firebaseConfigOxu();
 
   let firestoreDb = null;
   let firebaseHazir = false;
@@ -1501,10 +1517,46 @@
     }
   }
 
+  let firebaseKonfiqGozleyenEmeliyyat = null; // konfiq yadda saxlanandan sonra hansı əməliyyata davam ediləcək
+
+  function firebaseKonfiqModalAc(sonraEmeliyyat) {
+    firebaseKonfiqGozleyenEmeliyyat = sonraEmeliyyat || null;
+    document.getElementById('firebaseKonfiqApiKey').value = firebaseConfig.apiKey || '';
+    document.getElementById('firebaseKonfiqAuthDomain').value = firebaseConfig.authDomain || '';
+    document.getElementById('firebaseKonfiqProjectId').value = firebaseConfig.projectId || '';
+    document.getElementById('firebaseKonfiqError').innerText = '';
+    modalAc('firebaseKonfiqModal');
+  }
+
+  function firebaseKonfiqKaydet() {
+    const errEl = document.getElementById('firebaseKonfiqError');
+    const apiKey = document.getElementById('firebaseKonfiqApiKey').value.trim();
+    const authDomain = document.getElementById('firebaseKonfiqAuthDomain').value.trim();
+    const projectId = document.getElementById('firebaseKonfiqProjectId').value.trim();
+    if (!apiKey || !authDomain || !projectId) {
+      errEl.innerText = 'Hər üç sahəni doldur: apiKey, authDomain, projectId.';
+      return;
+    }
+    localStorage.setItem('fb_apiKey', apiKey);
+    localStorage.setItem('fb_authDomain', authDomain);
+    localStorage.setItem('fb_projectId', projectId);
+    firebaseConfig = firebaseConfigOxu();
+    // Əvvəlki konfiqlə artıq başlanmış Firebase App varsa, yenisi ilə yenidən başlamaq üçün sıfırla.
+    firebaseHazir = false;
+    firestoreDb = null;
+    modalKapat('firebaseKonfiqModal');
+
+    const davamEt = firebaseKonfiqGozleyenEmeliyyat;
+    firebaseKonfiqGozleyenEmeliyyat = null;
+    if (davamEt === 'olustur') senkronKeyOlustur();
+    else if (davamEt === 'gir') senkronKeyGirModalAc();
+  }
+
   function senkronKeyOlustur() {
-    if (!firebaseConfig.apiKey) { alert('Anlıq sinxronizasiya hazırda deaktiv edilib (köhnə açar silinib). İşə salmaq üçün kodda öz Firebase layihənizin konfiqini yazmalısınız.'); return; }
+    if (!firebaseConfig.apiKey) { firebaseKonfiqModalAc('olustur'); return; }
     senkronKey = uzunRastgeleKod(32);
     localStorage.setItem('firebase_sync_key', senkronKey);
+    veriMenbeGuvenli = true; // tamamilə yeni key — cari yerli vəziyyəti bilə-bilə buluda göndəririk
     firebasePanelGuncelle();
     firebaseDinlemeyeBasla();
     firebaseYazEt(); // yerli məlumatı dərhal göndər ki, ilk andan Sync Key işlək olsun
@@ -1528,23 +1580,60 @@
   }
 
   function senkronKeyGirModalAc() {
+    if (!firebaseConfig.apiKey) { firebaseKonfiqModalAc('gir'); return; }
     document.getElementById('senkronKeyGirInput').value = '';
     document.getElementById('senkronKeyGirError').innerText = '';
     modalAc('senkronKeyGirModal');
   }
 
-  function senkronKeyGirOnayla() {
-    if (!firebaseConfig.apiKey) { document.getElementById('senkronKeyGirError').innerText = 'Anlıq sinxronizasiya deaktiv edilib (köhnə açar silinib).'; return; }
+  async function senkronKeyGirOnayla() {
+    const errEl = document.getElementById('senkronKeyGirError');
+    if (!firebaseConfig.apiKey) { errEl.innerText = 'Əvvəlcə öz Firebase layihə konfiqini daxil et.'; return; }
     const val = document.getElementById('senkronKeyGirInput').value.trim();
     if (!val) {
-      document.getElementById('senkronKeyGirError').innerText = 'Sync Key yaz.';
+      errEl.innerText = 'Sync Key yaz.';
       return;
     }
-    senkronKey = val;
-    localStorage.setItem('firebase_sync_key', senkronKey);
-    modalKapat('senkronKeyGirModal');
-    firebasePanelGuncelle();
-    firebaseDinlemeyeBasla();
+
+    // TƏHLÜKƏSİZLİK: yeni key təsdiqlənənə (bulud verisi HƏQİQƏTƏN oxunana) qədər
+    // yazma qadağandır. Əvvəllər burada sadəcə passiv onSnapshot dinləməsi
+    // başladılırdı — əgər ilk snapshot gecikirdisə/səssizcə xəta verirdisə, ekran
+    // boş qalır və növbəti hər hansı bir toxunuş bu boşluğu buluda yazıb əsl
+    // datanı silirdi. İndi əvvəlcə AKTİV, gözlənilən bir oxuma edirik.
+    veriMenbeGuvenli = false;
+    errEl.innerText = 'Buluddan yüklənir...';
+
+    try {
+      if (!firebaseHazir) {
+        const hazir = await vaxtAsimiIle(firebaseBaslat(), 15000);
+        if (!hazir || !firestoreDb) {
+          errEl.innerText = 'Buluda qoşulmadı, internetini yoxla və yenidən cəhd et.';
+          return;
+        }
+      }
+
+      const snap = await firestoreDb.collection('syncs').doc(val).get();
+
+      // Yalnız oxuma HƏQİQƏTƏN uğurlu olduqdan sonra key-i təsdiqləyib saxlayırıq.
+      senkronKey = val;
+      localStorage.setItem('firebase_sync_key', senkronKey);
+
+      if (snap.exists && snap.data() && snap.data().data) {
+        driveVerisiniTetbiqEt(snap.data().data);
+      } else {
+        // Sənəd həqiqətən boşdursa (yeni/səhv key) — indi bunu bilə-bilə boşa keçirik.
+        yerliVeriniYukle();
+      }
+      veriMenbeGuvenli = true;
+
+      modalKapat('senkronKeyGirModal');
+      ekraniGuncelle();
+      firebasePanelGuncelle();
+      firebaseDinlemeyeBasla();
+    } catch (e) {
+      console.warn('Sync Key ilə oxuma xətası:', e);
+      errEl.innerText = 'Buluddan oxuma alınmadı, yenidən cəhd et.';
+    }
   }
 
   function firebaseDinlemeyeBasla() {
@@ -1570,6 +1659,7 @@
       }
 
       driveVerisiniTetbiqEt(remote.data);
+      veriMenbeGuvenli = true;
       ekraniGuncelle();
       const hesablarModalEl = document.getElementById('hesablarModal');
       if (hesablarModalEl && hesablarModalEl.classList.contains('active') && typeof hesablarGoster === 'function') {
@@ -1678,6 +1768,12 @@
   let gunlukLimit = null; // gündəlik xərc limiti — istifadəçi "Ayarlar" bölməsindən özü təyin edir, invented default yoxdur
   let hesabEklenib = { nagd: false, debit: false, depozit: false }; // hansı hesablar "+" ilə əlavə edilib — kredit/kredit xətt öz sahələrindən (kreditLimit / krediBorcu) məlumdur
   let veriYuklendi = false;
+  // TƏHLÜKƏSİZLİK QIFILI: true YALNIZ bulud vəziyyəti QƏTİ şəkildə təsdiqlənəndə olur —
+  // ya həqiqi data uğurla oxunub, ya da sənədin HƏQİQƏTƏN boş (yeni key) olduğu təsdiqlənib,
+  // ya da ümumiyyətlə heç bir Sync Key yoxdur (təklikdə iş rejimi). Bağlantı xətası/vaxt
+  // aşımı zamanı FALSE olaraq qalır ki, ekranda görünən (yalançı) boş vəziyyət səhvən
+  // Firestore-a yazılıb əsl buludda olan datanı silməsin. veriKaydet() bu bayrağı yoxlayır.
+  let veriMenbeGuvenli = false;
   let aylikPastaChart = null; // Chart.js: kateqoriya dağılımı (pasta)
   let aylikTrendChart = null; // Chart.js: günlük xərc trendi (xətt)
   let dashUmumiBorcChart = null; // Chart.js: dashboard — ümumi borc dairəvi diaqramı
@@ -1761,7 +1857,7 @@
     let firebaseDenGeldi = false;
     let senedTesdiqlenmisBosdur = false; // Firebase-ə çatdıq VƏ sənəd HƏQİQƏTƏN boşdur (yeni key) — fərq: bağlantı xətası deyil
     try {
-      const hazir = await vaxtAsimiIle(firebaseBaslat(), 8000);
+      const hazir = await vaxtAsimiIle(firebaseBaslat(), 15000);
       if (hazir && firestoreDb && senkronKey) {
         const snap = await firestoreDb.collection('syncs').doc(senkronKey).get();
         if (snap.exists && snap.data() && snap.data().data) {
@@ -1781,8 +1877,11 @@
       // çatıb sənədin HƏQİQƏTƏN boş (yeni key) olduğunu təsdiqləmiş olaq. Əks halda
       // (bağlantı xətası/vaxt aşımı) heç nə yazmırıq — real buludda olan datanı
       // təsadüfən boşla əvəz etməmək üçün.
-      if (senedTesdiqlenmisBosdur) firebaseYazEt();
-      else if (senkronKey) firebasePanelGuncelle('Buluda qoşulmadı — yenidən cəhd et.', true);
+      if (senedTesdiqlenmisBosdur) { firebaseYazEt(); veriMenbeGuvenli = true; }
+      else if (senkronKey) { firebasePanelGuncelle('Buluda qoşulmadı — yenidən cəhd et.', true); veriMenbeGuvenli = false; }
+      else { veriMenbeGuvenli = true; } // Sync Key ümumiyyətlə yoxdur — təklikdə rejim qəsdən icazəlidir
+    } else {
+      veriMenbeGuvenli = true;
     }
 
     veriYuklendi = true;
@@ -1800,6 +1899,15 @@
   async function veriKaydet() {
     try {
       sonDeyisiklikVaxti = new Date().toISOString();
+      // TƏHLÜKƏSİZLİK QIFILI: bulud vəziyyəti hələ təsdiqlənməyibsə (bağlantı
+      // gözlənilir/uğursuzdur), Firestore-a HEÇ NƏ yazma — əks halda ekranda
+      // görünən müvəqqəti boş vəziyyət əsl buludda olan datanın üzərinə yazılıb
+      // onu silə bilər. İstifadəçiyə də xəbər ver ki, dəyişiklik itməsin.
+      if (senkronKey && !veriMenbeGuvenli) {
+        console.warn('Yadda saxlama bloklandı: bulud mənbəyi hələ təsdiqlənməyib (bağlantı gözlənilir).');
+        firebasePanelGuncelle('Bulud hələ təsdiqlənməyib — dəyişiklik göndərilmədi, bağlantını yoxla.', true);
+        return;
+      }
       // QƏSDƏN localStorage-a YAZILMIR — məlumatın YEGANƏ mənbəyi Firestore-dur.
       firebaseYazPlanla();
     } catch (e) {
