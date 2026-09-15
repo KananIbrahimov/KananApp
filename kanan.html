@@ -2559,7 +2559,13 @@
     } catch (e) {
       console.warn('Keş təmizləmə xətası:', e);
     }
-    location.reload(true);
+    // location.reload(true) müasir brauzerlərdə artıq HTTP keşini bypass etmir
+    // (arqument deprecated olub, sadə reload() kimi işləyir). Ona görə köhnə
+    // versiya keşdən qayıdır və 3-4 basışdan sonra təsadüfən yenilənirdi.
+    // Bunun əvəzinə unikal sorğu parametrli TAM YENİ URL-ə keçirik — brauzer
+    // bunu fərqli resurs sayıb məcburi şəkildə şəbəkədən yükləyir.
+    const bazaUrl = location.origin + location.pathname;
+    location.replace(bazaUrl + '?yenile=' + Date.now());
   }
 
   function ayarlarPaneliniAc() {
