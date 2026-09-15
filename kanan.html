@@ -1606,9 +1606,66 @@
       firebasePanelGuncelle('Göndərmə alınmadı.', true);
     }
   }
+
+  // ==== Saatlıq avtomatik snapshot backup ====
+  // 'syncs/{key}' sənədi HƏMİŞƏ ən son vəziyyəti göstərir (üzərinə yazılır) —
+  // əvvəlki halların tarixçəsini saxlamır. Bu bölmə isə hər ~1 saatda bir
+  // ayrıca, tarixli bir sənəd yaradıb 'backups/{key}/versions/' altında saxlayır,
+  // beləki lazım olsa köhnə bir ana qayıtmaq mümkün olsun. Manuel JSON endirməyə
+  // ehtiyac qalmır.
+  const AVTOMATIK_BACKUP_ARALIGI_MS = 60 * 60 * 1000; // 1 saat
+  const AVTOMATIK_BACKUP_SAXLAMA_SAYI = 48; // ~2 gün, sonra ən köhnələr silinir
+
+  function sonAvtomatikBackupVaxtiOxu() {
+    if (!senkronKey) return 0;
+    const v = localStorage.getItem('son_avtomatik_backup_' + senkronKey);
+    return v ? parseInt(v, 10) : 0;
+  }
+  function sonAvtomatikBackupVaxtiYaz(ms) {
+    if (!senkronKey) return;
+    localStorage.setItem('son_avtomatik_backup_' + senkronKey, String(ms));
+  }
+
+  async function avtomatikBackupYarat() {
+    if (!firebaseHazir || !senkronKey || !firestoreDb) return;
+    try {
+      const indi = new Date();
+      const docId = indi.toISOString();
+      await firestoreDb.collection('backups').doc(senkronKey).collection('versions').doc(docId).set({
+        data: driveBackupVerisi(),
+        backupTarixi: docId,
+        cihazId
+      });
+      sonAvtomatikBackupVaxtiYaz(indi.getTime());
+      avtomatikBackupKohnelerTemizle();
+    } catch (e) {
+      console.warn('Avtomatik backup xətası:', e);
+    }
+  }
+
+  // Yalnız son N snapshotu saxlayır, qalanları silir ki, Firestore-da yer boş qalmasın.
+  async function avtomatikBackupKohnelerTemizle() {
+    if (!firebaseHazir || !senkronKey || !firestoreDb) return;
+    try {
+      const snap = await firestoreDb.collection('backups').doc(senkronKey).collection('versions')
+        .orderBy('backupTarixi', 'desc').get();
+      if (snap.size <= AVTOMATIK_BACKUP_SAXLAMA_SAYI) return;
+      const silinecekler = snap.docs.slice(AVTOMATIK_BACKUP_SAXLAMA_SAYI);
+      for (const d of silinecekler) { await d.ref.delete(); }
+    } catch (e) {
+      console.warn('Köhnə backup təmizləmə xətası:', e);
+    }
+  }
+
+  function avtomatikBackupKontrolEt() {
+    if (!firebaseHazir || !senkronKey || !firestoreDb) return;
+    const kecenVaxt = Date.now() - sonAvtomatikBackupVaxtiOxu();
+    if (kecenVaxt >= AVTOMATIK_BACKUP_ARALIGI_MS) avtomatikBackupYarat();
+  }
+  // ==================== /Saatlıq avtomatik snapshot backup ====================
   // ==================== /Firebase ====================
 
-  const APP_VERSION = '1.6'; // hər yeni göndərilən html versiyasında əl ilə +1 artırılır
+  const APP_VERSION = '1.7'; // hər yeni göndərilən html versiyasında əl ilə +1 artırılır
   let aktifDonem = 'gunluk';
   let goruntulenenTarix = new Date(); goruntulenenTarix.setHours(0, 0, 0, 0);
   let kategoriler = [];
@@ -1756,7 +1813,11 @@
     ekraniGuncelle();
     driveMenyuGuncelle();
     firebasePanelGuncelle();
-    if (firebaseHazir && senkronKey) firebaseDinlemeyeBasla();
+    if (firebaseHazir && senkronKey) {
+      firebaseDinlemeyeBasla();
+      avtomatikBackupKontrolEt(); // açılışda 1 saatdan çox keçibsə dərhal backup al
+      setInterval(avtomatikBackupKontrolEt, 15 * 60 * 1000); // sonra hər 15 dəqiqədə yoxla
+    }
   }
 
   async function veriKaydet() {
