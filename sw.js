@@ -5,7 +5,7 @@
 
 // VACİB: Hər yeni versiya buraxdıqda bu adı artır (v3 → v4 → v5 ...).
 // Bu, köhnə keşin avtomatik təmizlənməsini təmin edir.
-const CACHE_ADI = 'gider-takibi-cache-v3';
+const CACHE_ADI = 'gider-takibi-cache-v4';
 
 const KESLENECEK_FAYLLAR = [
   './index.html',
