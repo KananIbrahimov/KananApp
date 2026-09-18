@@ -2,7 +2,7 @@
   "name": "Günlük Xərclər",
   "short_name": "Xərclər",
   "description": "Günlük gider, kredit kartı borcu, hesablar və büdcə takibi",
-  "start_url": "./index.html",
+  "start_url": "./",
   "scope": "./",
   "display": "standalone",
   "orientation": "portrait",
