@@ -242,6 +242,13 @@
   .cat-btn .name { font-size: 13.5px; text-align: center; }
   .cat-btn .sub { font-size: 11px; opacity: 0.85; font-weight: 500; }
 
+  /* Xərclər ekranı: günlük (tiksiz) və aylıq sabit (tikli) kateqoriyalar arasında xətt */
+  .grid-ayirici {
+    grid-column: 1 / -1; display: flex; align-items: center; gap: 10px;
+    color: var(--muted); font-size: 11.5px; font-weight: 600; margin: 2px 0;
+  }
+  .grid-ayirici::before, .grid-ayirici::after { content: ''; flex: 1; height: 1px; background: var(--input-border); }
+
   .dashed-btn {
     width: 100%; margin-bottom: 22px; border: 1.5px dashed #b9c1d1; background: transparent;
     color: var(--muted); font-weight: 600; padding: 11px; border-radius: var(--radius-md);
@@ -335,6 +342,9 @@
   input:focus { border-color: var(--navy-soft); }
   .swatch { width: 20px; height: 20px; border-radius: 50%; cursor: pointer; border: 2px solid var(--swatch-border); box-shadow: 0 0 0 1px var(--line); }
   .swatch.selected { box-shadow: 0 0 0 2px var(--navy); }
+  /* 20 rəngli palitra: 10-10 iki sıra */
+  .renk-grid { display: grid; grid-template-columns: repeat(10, 1fr); gap: 8px 4px; justify-items: center; padding-top: 2px; }
+  .renk-grid .swatch { width: 22px; height: 22px; }
   .btn { border: none; border-radius: 10px; padding: 9px 16px; font-size: 13.5px; font-weight: 600; cursor: pointer; }
   .btn-primary { background: var(--navy); color: #fff; }
   .btn-primary:hover { background: var(--navy-soft); }
@@ -472,6 +482,18 @@
   }
   .hesabat-cemi-card .k { font-size: 12.5px; color: var(--gold-ink); font-weight: 600; }
   .hesabat-cemi-card .v { font-size: 22px; font-weight: 700; color: var(--gold-ink-dark); margin-top: 2px; }
+  /* Aylıq hesabat: 2 dairəvi qrafik (günlük xərclər / aylıq sabit xərclər) */
+  .hesabat-bolme-basliq { font-size: 14px; margin: 18px 0 10px; color: var(--ink); }
+  .hesabat-kart { background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius-lg); padding: 14px; margin-bottom: 16px; }
+  .donut-sarici { position: relative; width: 100%; max-width: 250px; aspect-ratio: 1 / 1; margin: 0 auto; }
+  .donut-sarici canvas { width: 100% !important; height: 100% !important; }
+  .donut-merkez { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; pointer-events: none; padding: 0 20%; }
+  .donut-merkez .t { font-size: 10.5px; color: var(--muted); font-weight: 600; }
+  .donut-merkez .b { font-weight: 800; color: var(--ink); line-height: 1.15; margin-top: 2px; white-space: nowrap; }
+  .donut-merkez .s { font-size: 11.5px; color: var(--muted); font-weight: 600; margin-top: 3px; }
+  .donut-merkez .b.over, .donut-merkez .s.over { color: var(--danger); }
+  .donut-caption { text-align: center; font-size: 12px; color: var(--muted); margin: 10px 0 14px; }
+  .donut-caption:empty { display: none; }
   .hesabat-row { margin-bottom: 12px; }
   .hesabat-row-top { display: flex; justify-content: space-between; font-size: 13.5px; font-weight: 600; color: var(--ink); margin-bottom: 5px; }
   .hesabat-bar-bg { width: 100%; height: 10px; background: var(--panel-alt); border-radius: 999px; overflow: hidden; }
@@ -665,6 +687,10 @@
     <div class="field-row" style="margin-bottom:6px;">
       <input type="number" step="0.01" min="0" id="newCatFixed" placeholder="Sabit tutar (boş = hər dəfə soruş)">
     </div>
+    <label class="field-row" style="gap:8px; font-size:13px; color:var(--ink); margin:4px 0 10px; cursor:pointer;">
+      <input type="checkbox" id="newCatAylik" style="width:auto;">
+      <span>📌 Aylıq sabit xərcdir <span style="color:var(--muted);">(tik yoxdursa – günlük xərc)</span></span>
+    </label>
     <div class="error-text" id="newCatError"></div>
     <div class="modal-footer">
       <button class="btn btn-ghost" onclick="modalKapat('newCatModal')">Ləğv et</button>
@@ -864,7 +890,7 @@
       <button onclick="yonetimPaneliniKapat()" style="background:none; border:none; font-size:18px; color:var(--navy-soft); cursor:pointer; padding:0 8px 0 0;">←</button>
       <h2 style="margin:0; flex:1;">Kateqoriyalar</h2>
     </div>
-    <p class="hint">Adını, ikonunu, rəngini və sabit qiymətini dəyiş.</p>
+    <p class="hint">Adını, ikonunu, rəngini, sabit qiymətini və günlük/aylıq növünü dəyiş.</p>
     <div id="kategoriDuzenlemeListesi" class="modal-list"></div>
     <div class="modal-footer" style="justify-content:space-between;">
       <button class="btn btn-ghost" onclick="yeniKategoriModalAc()">➕ Yeni kateqoriya</button>
@@ -883,12 +909,30 @@
     <div class="hesabat-cemi-card">
       <div class="k">Bu ay xərclədiyin</div>
       <div class="v" id="aylikHesabatCemi">—</div>
+      <div class="k" id="aylikHesabatAlt" style="margin-top:4px; font-weight:500;"></div>
     </div>
-    <div style="background:var(--panel); border:1px solid var(--line); border-radius:var(--radius-lg); padding:14px; margin-bottom:16px;">
-      <canvas id="aylikPastaCanvas" height="200"></canvas>
-      <p class="empty-note" id="aylikPastaBosMesaj" style="display:none;">Bu ay hələ xərc yoxdur.</p>
+
+    <h3 class="hesabat-bolme-basliq">🛒 Günlük xərclər</h3>
+    <div class="hesabat-kart">
+      <div class="donut-sarici" id="aylikGunlukSarici">
+        <canvas id="aylikGunlukCanvas"></canvas>
+        <div class="donut-merkez" id="aylikGunlukMerkez"></div>
+      </div>
+      <p class="empty-note" id="aylikGunlukBosMesaj" style="display:none;"></p>
+      <div class="donut-caption" id="aylikGunlukCaption"></div>
+      <div id="aylikGunlukListesi"></div>
     </div>
-    <div id="aylikHesabatListesi"></div>
+
+    <h3 class="hesabat-bolme-basliq">📌 Aylıq sabit xərclər</h3>
+    <div class="hesabat-kart">
+      <div class="donut-sarici" id="aylikSabitSarici">
+        <canvas id="aylikSabitCanvas"></canvas>
+        <div class="donut-merkez" id="aylikSabitMerkez"></div>
+      </div>
+      <p class="empty-note" id="aylikSabitBosMesaj" style="display:none;"></p>
+      <div id="aylikSabitListesi"></div>
+    </div>
+
     <h3 style="font-size:14px; margin:18px 0 10px; color:var(--ink);">Günlük xərc trendi (bu ay)</h3>
     <div style="background:var(--panel); border:1px solid var(--line); border-radius:var(--radius-lg); padding:14px; margin-bottom:16px;">
       <canvas id="aylikTrendCanvas" height="160"></canvas>
@@ -1962,7 +2006,8 @@
   // aşımı zamanı FALSE olaraq qalır ki, ekranda görünən (yalançı) boş vəziyyət səhvən
   // Firestore-a yazılıb əsl buludda olan datanı silməsin. veriKaydet() bu bayrağı yoxlayır.
   let veriMenbeGuvenli = false;
-  let aylikPastaChart = null; // Chart.js: kateqoriya dağılımı (pasta)
+  let aylikGunlukChart = null; // Chart.js: aylıq hesabat — günlük xərclər dairəsi
+  let aylikSabitChart = null; // Chart.js: aylıq hesabat — aylıq sabit xərclər dairəsi
   let aylikTrendChart = null; // Chart.js: günlük xərc trendi (xətt)
   let dashUmumiBorcChart = null; // Chart.js: dashboard — ümumi borc dairəvi diaqramı
   let dashKrediKartChart = null; // Chart.js: dashboard — kredit kartı limiti dairəvi diaqramı
@@ -1971,7 +2016,18 @@
   function cssVar(ad) {
     return getComputedStyle(document.documentElement).getPropertyValue(ad).trim();
   }
-  const renkPaleti = ['#1f2a44','#c99a3a','#3d7068','#8b5f8f','#b5533f','#4a6fa5','#7a8450','#a35c7a'];
+  // 20 rəng: ilk 8-i köhnə palitradır (mövcud kateqoriyaların rəngi seçili qalsın deyə eyni saxlanılıb).
+  const renkPaleti = [
+    '#1f2a44','#c99a3a','#3d7068','#8b5f8f','#b5533f','#4a6fa5','#7a8450','#a35c7a',
+    '#2b7a56','#d97b3a','#c0435a','#5aa5b5','#6b5bb5','#8a6d4b','#e0a3b8','#9fbf5a',
+    '#e6c84f','#7d3c5e','#b8a9d9','#86c5a3'
+  ];
+
+  // Kateqoriya "aylıq sabit xərc"dirsə true (tik aktivdir); tiksiz / tapılmayan kateqoriya = günlük xərc.
+  function kategoriAylikdirmi(ad) {
+    const k = kategoriler.find(x => x.ad === ad);
+    return !!(k && k.aylik);
+  }
 
   const varsayilanKategoriler = [
     { ad: 'Bus', sabitTutar: null, renk: '#1f2a44', ikon: '🚌' },
@@ -2337,22 +2393,33 @@
     if (insightTopEl) insightTopEl.innerText = topKategoriAd ? topKategoriAd : '—';
 
     const bugunkuToplam = giderler
-      .filter(g => !g.aylikRef && new Date(g.tamTarix).toDateString() === goruntulenenTarix.toDateString())
+      .filter(g => !g.aylikRef && !kategoriAylikdirmi(g.kategori) && new Date(g.tamTarix).toDateString() === goruntulenenTarix.toDateString()) // günlük limitə yalnız GÜNLÜK xərclər (tiksiz kateqoriyalar) daxildir
       .reduce((acc, g) => acc + g.tutar, 0);
     gunlukLimitGuncelle(bugunkuToplam);
 
     const butonlarEl = document.getElementById('butonlarKonteyneri');
     if (butonlarEl) {
       butonlarEl.innerHTML = '';
-      kategoriler.forEach((kat, index) => {
+      const kategoriDugmesiYarat = (kat, index) => {
         const btn = document.createElement('button');
         btn.className = 'cat-btn';
         btn.style.background = kat.renk;
         const altYazi = kat.sabitTutar !== null ? kat.sabitTutar.toFixed(2) + ' AZN' : 'Tutar soruşulur';
         btn.innerHTML = `<span class="name">${escapeHtml(kat.ikon)} ${escapeHtml(kat.ad)}</span><span class="sub">${escapeHtml(altYazi)}</span>`;
-        btn.onclick = () => kategoriyeTikla(index);
-        butonlarEl.appendChild(btn);
-      });
+        btn.onclick = () => kategoriyeTikla(index); // index = kateqoriyanın ƏSL sıra nömrəsi (qruplaşdırma bunu dəyişmir)
+        return btn;
+      };
+      // Yuxarıda günlük xərclər (tiksizlər), sonra xətt, sonra aylıq sabit xərclər (tiklilər)
+      const gunlukIndeksler = [], aylikIndeksler = [];
+      kategoriler.forEach((kat, index) => (kat.aylik ? aylikIndeksler : gunlukIndeksler).push(index));
+      gunlukIndeksler.forEach(i => butonlarEl.appendChild(kategoriDugmesiYarat(kategoriler[i], i)));
+      if (gunlukIndeksler.length && aylikIndeksler.length) {
+        const ayirici = document.createElement('div');
+        ayirici.className = 'grid-ayirici';
+        ayirici.innerHTML = '<span>📌 Aylıq sabit xərclər</span>';
+        butonlarEl.appendChild(ayirici);
+      }
+      aylikIndeksler.forEach(i => butonlarEl.appendChild(kategoriDugmesiYarat(kategoriler[i], i)));
     }
 
     // Geriyə tarixli düzəlişlər/əlavələr sonra da xronoloji sıralı görünsün deyə,
@@ -2591,6 +2658,7 @@
   function yeniKategoriModalAc() {
     document.getElementById('newCatName').value = '';
     document.getElementById('newCatFixed').value = '';
+    const aylikTikSifir = document.getElementById('newCatAylik'); if (aylikTikSifir) aylikTikSifir.checked = false;
     document.getElementById('newCatError').innerText = '';
     modalAc('newCatModal');
   }
@@ -2606,7 +2674,11 @@
       const p = parseFloat(fixedVal.replace(',', '.'));
       if (!isNaN(p) && p > 0) sabitTutar = p;
     }
-    kategoriler.push({ ad, sabitTutar, renk: renkPaleti[kategoriler.length % renkPaleti.length], ikon: '💰' });
+    // Yeni kateqoriyaya hələ heç bir kateqoriyanın istifadə etmədiyi ilk rəngi ver (20 rəngdən)
+    const istifadeOlunanRenkler = new Set(kategoriler.map(k => k.renk));
+    const bosRenk = renkPaleti.find(r => !istifadeOlunanRenkler.has(r)) || renkPaleti[kategoriler.length % renkPaleti.length];
+    const aylikTikEl = document.getElementById('newCatAylik');
+    kategoriler.push({ ad, sabitTutar, renk: bosRenk, ikon: '💰', aylik: !!(aylikTikEl && aylikTikEl.checked) });
     modalKapat('newCatModal');
     ekraniGuncelle();
     if (document.getElementById('yonetimModal').classList.contains('active')) modalListesiniDoldur();
@@ -2669,13 +2741,15 @@
           <input type="text" value="${escapeHtml(kat.ad)}" onchange="kategoriAdGuncelle(${index}, this.value)" style="flex:1;">
           <button onclick="kategoriSilOnayla(${index})" style="background:none; border:none; cursor:pointer; font-size:14px;">🗑</button>
         </div>
-        <div class="field-row between" style="font-size:12px; color:var(--muted); border-top:1px solid var(--line); padding-top:8px;">
-          <div class="field-row" style="gap:6px;">
-            <span>Sabit tutar:</span>
-            <input type="number" step="0.01" value="${kat.sabitTutar !== null ? kat.sabitTutar : ''}" placeholder="Soruş" onchange="kategoriSabitTutarGuncelle(${index}, this.value)" style="width:78px;">
-          </div>
-          <div class="field-row" style="gap:4px;">${renkler}</div>
+        <label class="field-row" style="gap:8px; font-size:13px; font-weight:600; color:var(--ink); border-top:1px solid var(--line); padding-top:8px; cursor:pointer;">
+          <input type="checkbox" ${kat.aylik ? 'checked' : ''} onchange="kategoriAylikToggle(${index}, this.checked)" style="width:auto;">
+          <span>📌 Aylıq sabit xərc <span style="font-weight:400; color:var(--muted);">(tiksiz = günlük)</span></span>
+        </label>
+        <div class="field-row" style="font-size:12px; color:var(--muted); gap:6px;">
+          <span>Sabit tutar:</span>
+          <input type="number" step="0.01" value="${kat.sabitTutar !== null ? kat.sabitTutar : ''}" placeholder="Soruş" onchange="kategoriSabitTutarGuncelle(${index}, this.value)" style="width:78px;">
         </div>
+        <div class="renk-grid">${renkler}</div>
         <label class="field-row" style="gap:6px; font-size:12px; color:var(--muted); padding-top:2px; cursor:pointer;">
           <input type="checkbox" ${kat.sebebSoruş ? 'checked' : ''} onchange="kategoriSebebToggle(${index}, this.checked)" style="width:auto;">
           <span>Əlavə edərkən səbəb də soruşulsun</span>
@@ -2694,6 +2768,7 @@
   };
   window.kategoriRenkGuncelle = (i, renk) => { if (kategoriler[i]) kategoriler[i].renk = renk; modalListesiniDoldur(); };
   window.kategoriSebebToggle = (i, checked) => { if (kategoriler[i]) kategoriler[i].sebebSoruş = checked; };
+  window.kategoriAylikToggle = (i, checked) => { if (kategoriler[i]) kategoriler[i].aylik = !!checked; };
 
   // ---- Kateqoriyaların sürüşdürülərək sıralanması (drag-to-reorder) ----
   // Barmaqla/mouse ilə "☰" işarəsindən tutub yuxarı-aşağı çəkməklə kateqoriyaların
@@ -3117,45 +3192,71 @@
     return { buAyToplam, kecenAyToplam, buAyCemi };
   }
 
-  // Kateqoriya dağılımını pasta (doughnut) qrafik kimi göstərir.
-  function aylikPastaChartGoster(siraliKat) {
-    const canvas = document.getElementById('aylikPastaCanvas');
-    const bosMesaj = document.getElementById('aylikPastaBosMesaj');
-    if (!canvas) return;
-    if (typeof Chart === 'undefined') {
-      canvas.style.display = 'none';
-      if (bosMesaj) { bosMesaj.style.display = 'block'; bosMesaj.innerText = '📶 Qrafik üçün internet lazımdır.'; }
-      return;
-    }
-    if (aylikPastaChart) { aylikPastaChart.destroy(); aylikPastaChart = null; }
-    if (!siraliKat.length) {
-      canvas.style.display = 'none';
-      if (bosMesaj) { bosMesaj.style.display = 'block'; bosMesaj.innerText = 'Bu ay hələ xərc yoxdur.'; }
-      return;
-    }
-    canvas.style.display = 'block';
+  // Rəqəmi qısa yaz: 300 → "300", 312.5 → "312.5", 312.456 → "312.46"
+  function qisaRaqem(n) { return String(+Number(n).toFixed(2)); }
+
+  // Aylıq hesabatdakı dairəvi (doughnut) qrafik + ortasındakı yazı.
+  // cfg: { canvasId, bosMesajId, merkezId, dilimler:[{ad,ikon,renk,tutar}], qalan, merkezHtml, bosYazi, evvelki }
+  // "qalan" > 0 olarsa, ayrılmış məbləğdən qalan hissə açıq boz dilim kimi çəkilir.
+  function aylikDonutCiz(cfg) {
+    const canvas = document.getElementById(cfg.canvasId);
+    if (!canvas) return null;
+    const sarici = canvas.parentElement;
+    const bosMesaj = document.getElementById(cfg.bosMesajId);
+    const merkez = document.getElementById(cfg.merkezId);
+    if (cfg.evvelki) { cfg.evvelki.destroy(); }
+
+    const goster = (mesaj) => {
+      sarici.style.display = 'none';
+      if (bosMesaj) { bosMesaj.style.display = 'block'; bosMesaj.innerText = mesaj; }
+    };
+    if (typeof Chart === 'undefined') { goster('📶 Qrafik üçün internet lazımdır.'); return null; }
+
+    const dilimler = cfg.dilimler.filter(d => d.tutar > 0);
+    const qalan = cfg.qalan > 0 ? cfg.qalan : 0;
+    if (!dilimler.length && !qalan) { goster(cfg.bosYazi); return null; }
+
+    sarici.style.display = '';
     if (bosMesaj) bosMesaj.style.display = 'none';
-    const inkRengi = cssVar('--ink') || '#1c2333';
-    const panelRengi = cssVar('--panel') || '#ffffff';
-    aylikPastaChart = new Chart(canvas.getContext('2d'), {
+    if (merkez) merkez.innerHTML = cfg.merkezHtml;
+
+    const labels = dilimler.map(d => d.ikon + ' ' + d.ad);
+    const data = dilimler.map(d => Number(d.tutar.toFixed(2)));
+    const renkler = dilimler.map(d => d.renk);
+    if (qalan) {
+      labels.push('Qalıq');
+      data.push(Number(qalan.toFixed(2)));
+      renkler.push(cssVar('--line') || '#e3e7ee');
+    }
+    return new Chart(canvas.getContext('2d'), {
       type: 'doughnut',
-      data: {
-        labels: siraliKat.map(k => k.ikon + ' ' + k.ad),
-        datasets: [{
-          data: siraliKat.map(k => Number(k.tutar.toFixed(2))),
-          backgroundColor: siraliKat.map(k => k.renk),
-          borderColor: panelRengi,
-          borderWidth: 2
-        }]
-      },
+      data: { labels, datasets: [{ data, backgroundColor: renkler, borderColor: cssVar('--panel') || '#ffffff', borderWidth: 2 }] },
       options: {
         responsive: true,
-        cutout: '62%',
+        maintainAspectRatio: false,
+        cutout: '64%',
         plugins: {
-          legend: { position: 'bottom', labels: { color: inkRengi, boxWidth: 12, padding: 12, font: { size: 11 } } },
-          tooltip: { callbacks: { label: (ctx) => `${ctx.label}: ${ctx.parsed.toFixed(2)} AZN` } }
+          legend: { display: false }, // rəng izahı aşağıdakı siyahıdadır
+          tooltip: { callbacks: { label: (ctx) => ` ${ctx.label}: ${ctx.parsed.toFixed(2)} AZN` } }
         }
       }
+    });
+  }
+
+  // Dairənin altındakı kateqoriya siyahısı (rəng zolağı ilə)
+  function aylikSiyahiDoldur(elId, siraliKat, cemi) {
+    const listEl = document.getElementById(elId);
+    if (!listEl) return;
+    listEl.innerHTML = '';
+    const maxTutar = siraliKat.reduce((m, k) => Math.max(m, k.tutar), 0);
+    siraliKat.forEach(k => {
+      const barYuzde = maxTutar > 0 ? (k.tutar / maxTutar) * 100 : 0;
+      const cemYuzde = cemi > 0 ? (k.tutar / cemi) * 100 : 0;
+      const row = document.createElement('div');
+      row.className = 'hesabat-row';
+      row.innerHTML = `<div class="hesabat-row-top"><span>${escapeHtml(k.ikon)} ${escapeHtml(k.ad)}</span><span>${k.tutar.toFixed(2)} AZN · %${cemYuzde.toFixed(0)}</span></div>
+        <div class="hesabat-bar-bg"><div class="hesabat-bar-fill" style="width:${barYuzde}%; background:${escapeHtml(k.renk)};"></div></div>`;
+      listEl.appendChild(row);
     });
   }
 
@@ -3172,6 +3273,7 @@
     const gunlukToplamlar = new Array(buGunSayi).fill(0);
     giderler.forEach(g => {
       if (g.aylikRef) return;
+      if (kategoriAylikdirmi(g.kategori)) return; // günlük trend: aylıq sabit xərcləri (Azercell, bərbər...) qatmırıq
       const t = new Date(g.tamTarix);
       if (t.getFullYear() === buIl && t.getMonth() === buAy) {
         const gunIndex = t.getDate() - 1;
@@ -3218,32 +3320,67 @@
     const { buAyToplam, kecenAyToplam, buAyCemi } = aylikHesabatVerisi();
     document.getElementById('aylikHesabatCemi').innerText = buAyCemi.toFixed(2) + ' AZN';
 
-    const siraliKat = kategoriler
-      .map(k => ({ ad: k.ad, ikon: k.ikon, renk: k.renk, tutar: buAyToplam[k.ad] || 0 }))
+    // Kateqoriyaları günlük (tiksiz) və aylıq sabit (tikli) qruplara böl
+    const butunKat = kategoriler
+      .map(k => ({ ad: k.ad, ikon: k.ikon, renk: k.renk, aylik: !!k.aylik, tutar: buAyToplam[k.ad] || 0 }))
       .filter(k => k.tutar > 0)
       .sort((a, b) => b.tutar - a.tutar);
-    const maxTutar = siraliKat.length ? siraliKat[0].tutar : 0;
+    const gunlukKat = butunKat.filter(k => !k.aylik);
+    const sabitKat = butunKat.filter(k => k.aylik);
 
-    aylikPastaChartGoster(siraliKat);
-    aylikTrendChartGoster();
+    // Yekunlar (silinmiş / adı dəyişmiş kateqoriyaların xərcləri də günlük sayılır)
+    let gunlukCemi = 0, sabitCemi = 0;
+    Object.keys(buAyToplam).forEach(ad => {
+      if (kategoriAylikdirmi(ad)) sabitCemi += buAyToplam[ad]; else gunlukCemi += buAyToplam[ad];
+    });
+    const digerTutar = Math.round((gunlukCemi - gunlukKat.reduce((acc, k) => acc + k.tutar, 0)) * 100) / 100;
+    if (digerTutar > 0) gunlukKat.push({ ad: 'Digər', ikon: '📦', renk: '#8d96a8', tutar: digerTutar });
 
-    const listEl = document.getElementById('aylikHesabatListesi');
-    if (listEl) {
-      listEl.innerHTML = '';
-      if (siraliKat.length === 0) {
-        listEl.innerHTML = '<div class="breakdown-empty">Bu ay hələ xərc yoxdur.</div>';
-      } else {
-        siraliKat.forEach(k => {
-          const barYuzde = maxTutar > 0 ? (k.tutar / maxTutar) * 100 : 0;
-          const cemYuzde = buAyCemi > 0 ? (k.tutar / buAyCemi) * 100 : 0;
-          const row = document.createElement('div');
-          row.className = 'hesabat-row';
-          row.innerHTML = `<div class="hesabat-row-top"><span>${escapeHtml(k.ikon)} ${escapeHtml(k.ad)}</span><span>${k.tutar.toFixed(2)} AZN · %${cemYuzde.toFixed(0)}</span></div>
-            <div class="hesabat-bar-bg"><div class="hesabat-bar-fill" style="width:${barYuzde}%; background:${escapeHtml(k.renk)};"></div></div>`;
-          listEl.appendChild(row);
-        });
-      }
+    const altEl = document.getElementById('aylikHesabatAlt');
+    if (altEl) altEl.innerText = 'Günlük: ' + gunlukCemi.toFixed(2) + ' AZN · Aylıq sabit: ' + sabitCemi.toFixed(2) + ' AZN';
+
+    // ---- 1-ci dairə: günlük xərclər (ay üzrə ayrılan məbləğə qarşı) ----
+    const indi = new Date();
+    const aydakiGunSayi = new Date(indi.getFullYear(), indi.getMonth() + 1, 0).getDate(); // 30 gün → 600, 31 gün → 620 (limit 20 olsa)
+    const limitVar = (typeof gunlukLimit === 'number' && gunlukLimit > 0);
+    const ayButcesi = limitVar ? gunlukLimit * aydakiGunSayi : 0;
+    let gunlukMerkez;
+    if (limitVar) {
+      const yuzde = ayButcesi > 0 ? (gunlukCemi / ayButcesi) * 100 : 0;
+      const asib = gunlukCemi > ayButcesi;
+      const yaz = qisaRaqem(gunlukCemi) + ' / ' + qisaRaqem(ayButcesi);
+      const yazOlcu = yaz.length <= 9 ? 20 : (yaz.length <= 12 ? 17 : 14);
+      gunlukMerkez = `<div class="t">Günlük xərclər · AZN</div><div class="b ${asib ? 'over' : ''}" style="font-size:${yazOlcu}px;">${escapeHtml(yaz)}</div><div class="s ${asib ? 'over' : ''}">%${yuzde.toFixed(0)} istifadə olunub</div>`;
+    } else {
+      gunlukMerkez = `<div class="t">Günlük xərclər · AZN</div><div class="b" style="font-size:20px;">${escapeHtml(qisaRaqem(gunlukCemi))}</div><div class="s">Limit təyin edilməyib</div>`;
     }
+    aylikGunlukChart = aylikDonutCiz({
+      canvasId: 'aylikGunlukCanvas', bosMesajId: 'aylikGunlukBosMesaj', merkezId: 'aylikGunlukMerkez',
+      dilimler: gunlukKat, qalan: limitVar ? Math.max(0, ayButcesi - gunlukCemi) : 0,
+      merkezHtml: gunlukMerkez, bosYazi: 'Bu ay hələ günlük xərc yoxdur.', evvelki: aylikGunlukChart
+    });
+    const gunlukCaptionEl = document.getElementById('aylikGunlukCaption');
+    if (gunlukCaptionEl) {
+      gunlukCaptionEl.innerText = limitVar
+        ? aydakiGunSayi + ' gün × ' + qisaRaqem(gunlukLimit) + ' AZN = ' + qisaRaqem(ayButcesi) + ' AZN ay üzrə ayrılıb'
+        : 'Ayarlardan günlük limit təyin et — ay üzrə ayrılan məbləğ burada görünəcək.';
+    }
+    aylikSiyahiDoldur('aylikGunlukListesi', gunlukKat, gunlukCemi);
+
+    // ---- 2-ci dairə: aylıq sabit xərclər ----
+    const sabitMerkez = `<div class="t">Aylıq sabit · AZN</div><div class="b" style="font-size:20px;">${escapeHtml(qisaRaqem(sabitCemi))}</div><div class="s">${sabitKat.length} kateqoriya</div>`;
+    const hecBiriAylikDeyil = !kategoriler.some(k => k.aylik);
+    aylikSabitChart = aylikDonutCiz({
+      canvasId: 'aylikSabitCanvas', bosMesajId: 'aylikSabitBosMesaj', merkezId: 'aylikSabitMerkez',
+      dilimler: sabitKat, qalan: 0, merkezHtml: sabitMerkez,
+      bosYazi: hecBiriAylikDeyil
+        ? 'Heç bir kateqoriya aylıq sabit kimi işarələnməyib. Ayarlar → Kateqoriyalar bölməsində 📌 tikini aktiv et.'
+        : 'Bu ay aylıq sabit xərc yoxdur.',
+      evvelki: aylikSabitChart
+    });
+    aylikSiyahiDoldur('aylikSabitListesi', sabitKat, sabitCemi);
+
+    aylikTrendChartGoster();
 
     const trendEl = document.getElementById('aylikHesabatTrend');
     if (trendEl) {
