@@ -1573,15 +1573,43 @@
   }
 
   // ==================== Google ilə giriş / çıxış ====================
+  // iOS-da "Ana ekrana əlavə et" ilə açılan standalone PWA-larda signInWithPopup
+  // işləmir: iOS window.open-i məcburən Safari-yə açır və popup pəncərəsi ilə
+  // əsas tətbiq arasında əlaqə (postMessage) qırılır, nəticədə "The requested
+  // action is invalid" xətası görünür. Ona görə standalone rejimdə popup əvəzinə
+  // redirect axını istifadə edirik.
+  function standaloneRejimdedirmi() {
+    return window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone === true;
+  }
+
   function googleIleGirisEt() {
     const xetaEl = document.getElementById('googleGirisXeta');
     xetaEl.innerText = '';
     firebaseBaslat().then((hazir) => {
       if (!hazir) { xetaEl.innerText = 'Bağlantı alınmadı, internetini yoxla və yenidən cəhd et.'; return; }
       const provider = new firebase.auth.GoogleAuthProvider();
-      firebase.auth().signInWithPopup(provider).catch((e) => {
-        console.warn('Google giriş xətası:', e);
-        xetaEl.innerText = 'Giriş alınmadı, yenidən cəhd et.';
+      if (standaloneRejimdedirmi()) {
+        firebase.auth().signInWithRedirect(provider).catch((e) => {
+          console.warn('Google giriş xətası (redirect):', e);
+          xetaEl.innerText = 'Giriş alınmadı, yenidən cəhd et.';
+        });
+      } else {
+        firebase.auth().signInWithPopup(provider).catch((e) => {
+          console.warn('Google giriş xətası (popup):', e);
+          xetaEl.innerText = 'Giriş alınmadı, yenidən cəhd et.';
+        });
+      }
+    });
+  }
+
+  // Redirect axınından qayıdanda nəticəni tutmaq üçün (standalone rejimdə).
+  function girisRedirectNeticesiniYoxla() {
+    firebaseBaslat().then((hazir) => {
+      if (!hazir) return;
+      firebase.auth().getRedirectResult().catch((e) => {
+        console.warn('Redirect nəticəsi xətası:', e);
+        const xetaEl = document.getElementById('googleGirisXeta');
+        if (xetaEl) xetaEl.innerText = 'Giriş alınmadı, yenidən cəhd et.';
       });
     });
   }
@@ -1602,6 +1630,7 @@
       document.getElementById('googleGirisXeta').innerText = 'Bağlantı alınmadı, internetini yoxla və səhifəni yenilə.';
       return;
     }
+    girisRedirectNeticesiniYoxla(); // standalone rejimdən qayıdan redirect girişini tut
     firebase.auth().onAuthStateChanged((istifadeci) => {
       if (istifadeci) {
         cariGoogleIstifadeci = istifadeci;
