@@ -1589,14 +1589,15 @@
       if (!hazir) { xetaEl.innerText = 'Bağlantı alınmadı, internetini yoxla və yenidən cəhd et.'; return; }
       const provider = new firebase.auth.GoogleAuthProvider();
       if (standaloneRejimdedirmi()) {
+        xetaEl.innerText = 'Google-a yönləndirilir...';
         firebase.auth().signInWithRedirect(provider).catch((e) => {
           console.warn('Google giriş xətası (redirect):', e);
-          xetaEl.innerText = 'Giriş alınmadı, yenidən cəhd et.';
+          xetaEl.innerText = 'Giriş alınmadı: ' + (e && e.code ? e.code : (e && e.message ? e.message : 'naməlum xəta'));
         });
       } else {
         firebase.auth().signInWithPopup(provider).catch((e) => {
           console.warn('Google giriş xətası (popup):', e);
-          xetaEl.innerText = 'Giriş alınmadı, yenidən cəhd et.';
+          xetaEl.innerText = 'Giriş alınmadı: ' + (e && e.code ? e.code : (e && e.message ? e.message : 'naməlum xəta'));
         });
       }
     });
@@ -1606,10 +1607,13 @@
   function girisRedirectNeticesiniYoxla() {
     firebaseBaslat().then((hazir) => {
       if (!hazir) return;
-      firebase.auth().getRedirectResult().catch((e) => {
+      const xetaEl = document.getElementById('googleGirisXeta');
+      firebase.auth().getRedirectResult().then((res) => {
+        if (xetaEl && res && res.user) xetaEl.innerText = '';
+        else if (xetaEl) xetaEl.innerText = 'Redirect nəticəsi boş qayıtdı (istifadəçi yoxdur). Standalone rejimdə sessiya itmiş ola bilər.';
+      }).catch((e) => {
         console.warn('Redirect nəticəsi xətası:', e);
-        const xetaEl = document.getElementById('googleGirisXeta');
-        if (xetaEl) xetaEl.innerText = 'Giriş alınmadı, yenidən cəhd et.';
+        if (xetaEl) xetaEl.innerText = 'Giriş alınmadı: ' + (e && e.code ? e.code : (e && e.message ? e.message : 'naməlum xəta'));
       });
     });
   }
